@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NuBrakes Technician Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root{color-scheme:light;--bg:#f7f8fa;--card:#fff;--text:#111827;--muted:#6b7280;--soft:#9ca3af;--border:#e5e7eb;--border-soft:#f1f5f9;--green:#10b981;--red:#f43f5e;--indigo:#6366f1;--deep:#4a3aa7;--orange:#FF6B35;--dark:#111827;--shadow:0 1px 4px rgba(0,0,0,.06);--radius:12px;
+--heat-g1:#f0fdf7;--heat-g2:#dcfce9;--heat-g3:#bbf3d6;--heat-g4:#93e8bf;--heat-r1:#fff5f7;--heat-r2:#ffe6ea;--heat-r3:#fecdd6;--heat-r4:#fbb3c1}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+.app{min-height:100vh;padding:20px 16px}
+.app-inner{max-width:1320px;margin:0 auto}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap}
+.title{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.subtitle{margin:3px 0 0;font-size:12px;color:var(--muted)}
+h2{font-size:14px;margin:0 0 3px}
+.status-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.badge,.coverage,.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;border:1px solid;font-size:11px;font-weight:600;background:#fff}
+.badge.live{background:#ecfdf5;border-color:#6ee7b7;color:#065f46}
+.badge-dot{width:6px;height:6px;border-radius:999px;background:#10b981}
+.coverage,.chip{border-color:var(--border);color:var(--muted)}
+.viewswitch{display:inline-flex;gap:4px;background:#eaeef4;border-radius:11px;padding:4px}
+.viewswitch button{padding:9px 22px;border-radius:8px;border:0;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#64748b;display:inline-flex;align-items:center;gap:7px}
+.viewswitch button:hover{color:var(--text)}
+.viewswitch button.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.13)}
+.toolbar{display:flex;gap:8px;margin:14px 0 16px;flex-wrap:wrap;align-items:flex-end}
+.field{display:grid;gap:3px;font-size:9px;text-transform:uppercase;font-weight:700;color:var(--soft);letter-spacing:.05em}
+.select,input{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;color:#374151;background:#fff;min-width:160px;height:35px}
+select{cursor:pointer}
+.select.primary{border-color:var(--deep);font-weight:600;color:var(--text);min-width:230px}
+.idcard{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 18px;margin-bottom:16px}
+.avatar{width:44px;height:44px;border-radius:999px;background:var(--deep);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:0 0 auto;letter-spacing:.02em}
+.avatar.mkt{background:var(--orange)}
+.idname{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+.idmeta{margin:2px 0 0;font-size:11px;color:var(--muted)}
+.idstats{margin-left:auto;display:flex;gap:20px;flex-wrap:wrap}
+.idstat{text-align:right}
+.idstat b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+.idstat span{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:var(--soft);font-weight:700}
+.kpi-group{margin-bottom:18px}
+.group-name{font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.group-name em{font-style:normal;font-weight:600;color:#a5b0bf;text-transform:none;letter-spacing:0;font-size:10px}
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.card,.section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border-soft)}
+.card{padding:15px 17px 13px;min-height:168px;display:flex;flex-direction:column}
+.card.hero{border:1.5px solid #c7d2fe;box-shadow:0 2px 10px rgba(74,58,167,.09)}
+.card.hero .metric{color:var(--deep)}
+.card.hero .value{font-size:29px}
+.metric{font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.tag{font-size:8px;padding:2px 6px;border-radius:5px;background:#eef2ff;color:var(--deep);letter-spacing:.04em}
+.value{font-size:23px;font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.spark-wrap{display:flex;align-items:center;gap:7px;height:32px;margin:2px 0}
+.sparkline{display:block;width:100%;height:30px}
+.rows{margin-top:auto;padding-top:8px;border-top:1px dashed var(--border);display:grid;gap:3px}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--soft);align-items:baseline}
+.row b{font-weight:600;color:#4b5563;font-variant-numeric:tabular-nums}
+.delta{font-weight:700;font-variant-numeric:tabular-nums}
+.up{color:#047857}.down{color:#be123c}.flat{color:var(--soft)}
+.rankpill{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid var(--border);color:var(--muted);background:#fbfbfd}
+.rankpill.top{background:#ecfdf5;border-color:#6ee7b7;color:#065f46}
+.rankpill.low{background:#fff1f2;border-color:#fda4b0;color:#9f1239}
+.section{padding:16px 18px;margin-bottom:16px}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sec-head .small{margin:2px 0 0}
+.scroll{overflow:auto;border:1px solid var(--border-soft);border-radius:8px;max-height:70vh}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap}
+th{position:sticky;top:0;background:#f8fafc;color:var(--soft);font-size:10px;text-transform:uppercase;letter-spacing:.04em;z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
+th[data-sort]{cursor:pointer}th[data-sort]:hover{color:var(--text)}
+td,th{border-bottom:1px solid var(--border-soft);padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums}
+td:first-child,th:first-child,td.txt,th.txt{text-align:left}
+tbody tr:hover td:not(.heat){background:#fafbff}
+tbody tr.me td{font-weight:700}
+tbody tr.me .pin{box-shadow:inset 3px 0 0 var(--deep),1px 0 0 var(--border)}
+.pin{position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 var(--border)}
+th.pin{background:#f8fafc;z-index:3;box-shadow:1px 0 0 var(--border),inset 0 -1px 0 var(--border)}
+tbody tr:hover .pin{background:#fafbff}
+tfoot td{position:sticky;bottom:0;background:#fbfbfd;font-weight:700;border-top:1.5px solid var(--border);border-bottom:0;z-index:1}
+tfoot td.pin{z-index:2;background:#fbfbfd}
+.heat{border-radius:0}
+.link{color:#4338ca;font-weight:600;cursor:pointer}
+.link:hover{text-decoration:underline}
+.seg{display:inline-flex;gap:4px;background:#f1f5f9;border-radius:9px;padding:3px;flex-wrap:wrap}
+.seg button{padding:5px 12px;border-radius:6px;border:0;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:var(--soft)}
+.seg button:hover{color:var(--text)}
+.seg button.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.toggle{padding:6px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.toggle:hover{border-color:#cbd5e1;color:var(--text)}
+.toggle[aria-pressed="true"]{background:var(--dark);border-color:var(--dark);color:#fff}
+.toggle .dot{width:7px;height:7px;border-radius:999px;background:#cbd5e1}
+.toggle[aria-pressed="true"] .dot{background:#6ee7b7}
+.legend{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--soft);text-transform:uppercase;letter-spacing:.04em}
+.legend i{display:block;width:20px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.05)}
+.rangebar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.notice{max-width:1320px;margin:auto;padding:18px;border-radius:12px;background:#fff;border:1px solid var(--border);color:var(--muted)}
+.notice.small{margin-bottom:16px;padding:10px 14px}
+.chart-wrap{height:360px}
+.warnish{color:#c2410c}
+.small{font-size:11px;color:var(--muted);line-height:1.5}
+.btn{padding:6px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#374151}
+.btn:hover{border-color:#cbd5e1}
+.definition td,.definition th{text-align:left;white-space:normal;vertical-align:top}
+details.defs>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);list-style:none;padding:4px 0}
+details.defs>summary::-webkit-details-marker{display:none}
+details.defs>summary:hover{color:var(--text)}
+.hidden{display:none!important}
+@media(max-width:1023px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:639px){.app{padding:12px}.status-row{justify-content:flex-start}.field{flex:1}.select,.field input{min-width:100%;width:100%}.cards{grid-template-columns:1fr}.card{min-height:auto}.idstats{margin-left:0;width:100%}.idstat{text-align:left}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head><body>
+<main class="app" id="app"><div class="notice">Loading NuBrakes technician operations and labor feeds…</div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* ============================================================================
+   NuBrakes Technician Dashboard — V1
+   Data feeds are the same shared marts used by the Operations Manager dashboard.
+   Every number on the page comes from summarize(); render functions never do math.
+   ========================================================================== */
+const OPS_URL='https://nubrakes-analytics.github.io/NuBrakes-Copilot/data/fact_technician_operations_daily.json';
+const OPS_FALLBACK='https://raw.githubusercontent.com/nubrakes-analytics/NuBrakes-Copilot/main/data/fact_technician_operations_daily.json';
+const LABOR_URL='https://nubrakes-analytics.github.io/NuBrakes-Copilot/data/fact_technician_labor_weekly.json';
+const LABOR_FALLBACK='https://raw.githubusercontent.com/nubrakes-analytics/NuBrakes-Copilot/main/data/fact_technician_labor_weekly.json';
+
+/* dir: +1 higher is better, -1 lower is better, 0 volume-driven (never heat-shaded). */
+const METRICS={
+ revenue:{key:'revenue',label:'Month-to-Date Revenue',short:'Revenue',format:'currency',dir:1,perTech:true,
+  formula:'Σ revenue_amount',fields:'revenue_amount',description:'Invoiced revenue inside the selected period. Booked revenue is never counted here.'},
+ revenuePace:{key:'revenuePace',label:'Revenue Pace',short:'Rev Pace',format:'currency',dir:1,perTech:true,
+  formula:'Revenue ÷ days elapsed × days in period',fields:'revenue_amount, day',description:'Projected full-period revenue if the current daily rate holds. Elapsed days run from the first of the period through the latest day of data.'},
+ jobs:{key:'jobs',label:'Jobs Completed',short:'Jobs',format:'number',dir:1,perTech:true,
+  formula:'Σ completed_jobs_count',fields:'completed_jobs_count',description:'Completed jobs, whether or not they invoiced.'},
+ jobsPace:{key:'jobsPace',label:'Jobs Pace',short:'Jobs Pace',format:'number',dir:1,perTech:true,
+  formula:'Jobs ÷ days elapsed × days in period',fields:'completed_jobs_count, day',description:'Projected full-period job count at the current rate.'},
+ jobsPerDay:{key:'jobsPerDay',label:'Jobs per Day',short:'Jobs / Day',format:'number',dir:1,
+  formula:'Σ completed_jobs_count ÷ Σ worked_day_flag',fields:'completed_jobs_count, worked_day_flag',description:'Uses days actually worked, not calendar days, so time off never drags the number down.'},
+ avgTicket:{key:'avgTicket',label:'Average Ticket',short:'Avg Ticket',format:'currency',dir:1,
+  formula:'Σ revenue_amount ÷ Σ invoiced_jobs_count',fields:'revenue_amount, invoiced_jobs_count',description:'Ratio of the summed components, not an average of daily averages. The single clearest read on what a technician turns each job into.'},
+ ticketCompletion:{key:'ticketCompletion',label:'Ticket Completion Rate',short:'Ticket Compl.',format:'percent',dir:1,
+  formula:'Σ revenue_amount ÷ Σ booked_revenue_amount',fields:'revenue_amount, booked_revenue_amount',description:'Completed revenue against the revenue booked on the ticket. Above 100% means work sold on site came in above what was booked.'},
+ rotorAttach:{key:'rotorAttach',label:'Rotor Attachment Rate',short:'Rotor Attach',format:'percent',dir:1,
+  formula:'Σ rotor_attached_jobs_count ÷ Σ rotor_eligible_jobs_count',fields:'rotor_attached_jobs_count, rotor_eligible_jobs_count',description:'Eligible jobs only — jobs with no rotor opportunity are excluded from the denominator.'},
+ serviceRate:{key:'serviceRate',label:'Service Call Rate',short:'Service Call',format:'percent',dir:-1,
+  formula:'Σ service_call_jobs_count ÷ Σ completed_jobs_count',fields:'service_call_jobs_count, completed_jobs_count',description:'Return trips as a share of completed jobs. Lower is better, and it moves in lockstep with ticket quality — a rising service call rate usually shows up as a falling average ticket.'},
+ utilization:{key:'utilization',label:'Technician Utilization',short:'Utilization',format:'percent',dir:1,
+  formula:'Invoiced Hours ÷ Total Clocked Hours',fields:'invoiced_minutes, Hours',description:'Share of paid clock time that landed on an invoice. Payroll arrives weekly and lags the operations feed, so both sides of the ratio are restricted to the days that carry allocated payroll \u2014 a week of payroll that has not posted yet cannot inflate the number.',requiresLabor:true},
+ invoicedHours:{key:'invoicedHours',label:'Invoiced Hours',short:'Inv. Hours',format:'hours',dir:1,perTech:true,
+  formula:'Σ invoiced_minutes ÷ 60',fields:'invoiced_minutes',description:'Every billable hour written to invoices in the period, whether or not payroll has posted for that day.'},
+ invoicedHoursMatched:{key:'invoicedHoursMatched',label:'Invoiced Hours',short:'Inv. Hours (matched)',format:'hours',dir:1,perTech:true,
+  formula:'Σ invoiced_minutes ÷ 60 across payroll-covered days',fields:'invoiced_minutes, Hours',
+  description:'The literal numerator of utilization. It counts only the days that also carry clocked hours, so Invoiced Hours ÷ Total Clocked Hours on the cards always reproduces the utilization shown beside them. Once payroll has fully posted it equals Invoiced Hours exactly.',requiresLabor:true},
+ clockedHours:{key:'clockedHours',label:'Total Clocked Hours',short:'Clocked Hours',format:'hours',dir:0,perTech:true,
+  formula:'Σ allocated Hours',fields:'Hours, worked_day_flag',description:'Paid clock hours from weekly payroll, allocated to worked days. Understated for any period where payroll has not fully posted; the card says how many days are covered. Volume-driven, so it is never heat-shaded.',requiresLabor:true},
+ revenuePerDay:{key:'revenuePerDay',label:'Revenue / Day',short:'Rev / Day',format:'currency',dir:1,
+  formula:'Σ revenue_amount ÷ Σ worked_day_flag',fields:'revenue_amount, worked_day_flag',description:'Uses days worked, not calendar days.'},
+ daysWorked:{key:'daysWorked',label:'Days Worked',short:'Days',format:'number',dir:0,
+  formula:'Σ worked_day_flag',fields:'worked_day_flag',description:'Zero-activity days are excluded from every per-day average.'},
+ activeTechs:{key:'activeTechs',label:'Active Technicians',short:'Techs',format:'number',dir:0,
+  formula:'distinct technician_id with a worked day',fields:'technician_id, worked_day_flag',description:''}
+};
+/* Card layout. Average Ticket and Service Call Rate are the primary KPIs and render as hero cards. */
+const GROUPS=[
+ ['Revenue','invoiced revenue and where the period lands',['revenue','revenuePace']],
+ ['Jobs','throughput',['jobs','jobsPerDay']],
+ ['Ticket','what each job is worth',['avgTicket','serviceRate','ticketCompletion','rotorAttach']],
+ ['Productivity','invoiced hours against the clock',['utilization','invoicedHoursMatched','clockedHours']]
+];
+const HERO=new Set(['avgTicket','serviceRate']);
+const RANKED=['revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
+const TECH_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','invoicedHours','clockedHours','utilization'];
+const MARKET_COLS=['activeTechs','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
+/* Totals that grow with the length of the period. A period still in progress cannot be ranked
+   against complete ones on these, so it is left out of the scale and its own cells stay unshaded. */
+const LENGTH_SENSITIVE=new Set(['revenue','jobs','daysWorked','invoicedHours','invoicedHoursMatched','clockedHours']);
+const HISTORY_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
+const TREND_METRICS=['avgTicket','serviceRate','revenue','jobs','jobsPerDay','ticketCompletion','rotorAttach','utilization','revenuePerDay','invoicedHours'];
+/* Card labels that change with payroll coverage. */
+const MATCHED_SUFFIX=' (payroll-matched)';
+const RANGES=[['period','Selected period'],['l30','Last 30 days'],['l90','Last 90 days'],['l180','Last 6 months'],['ytd','Year to date'],['all','All data'],['custom','Custom']];
+const GRAINS=[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly']];
+
+const state={ops:[],labor:[],allocated:[],allocIndex:new Map(),
+ view:'tech',market:'All Markets',tech:'',employment:'all',
+ period:'month',periodKey:'',
+ trendMetric:'avgTicket',granularity:'weekly',range:{mode:'l90',start:'',end:''},trendLabels:false,
+ sort:{key:'revenue',dir:-1},heat:true,historyN:8,
+ cache:new Map()};
+let trendChart;
+
+/* ---------- primitives ---------- */
+const n=x=>Number(x)||0,day=r=>String(r.day).slice(0,10),week=r=>String(r.week).slice(0,10);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDate=s=>new Date(s+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
+const fmtDateY=s=>new Date(s+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+function num(v,f){if(v==null||Number.isNaN(v))return '—';
+ if(f==='currency')return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:Math.abs(v)>=1000?0:1}).format(v);
+ if(f==='percent')return (v*100).toFixed(1)+'%';
+ if(f==='hours')return v.toFixed(1)+'h';
+ return new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(v)}
+function numShort(v,f){if(v==null||!Number.isFinite(v))return '';
+ if(f==='currency'){let a=Math.abs(v);return a>=10000?(v<0?'-$':'$')+(a/1000).toFixed(1)+'k':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v)}
+ if(f==='percent')return (v*100).toFixed(0)+'%';
+ if(f==='hours')return v.toFixed(0)+'h';
+ return new Intl.NumberFormat('en-US',{maximumFractionDigits:Math.abs(v)<10?1:0}).format(v)}
+function shiftDays(iso,d){let x=new Date(iso+'T12:00:00');x.setDate(x.getDate()+d);return x.toISOString().slice(0,10)}
+function spanDays(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5)+1}
+function initials(s){return String(s||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
+
+/* ---------- period ---------- */
+function dataEnd(){return state.ops.map(day).sort().at(-1)}
+function dataStart(){return state.ops.map(day).sort()[0]}
+function periodKeys(){let k=state.period==='day'?state.ops.map(day):state.period==='week'?state.ops.map(week):state.ops.map(day).map(x=>x.slice(0,7));
+ return [...new Set(k.filter(Boolean))].sort()}
+function activePeriodKey(){let keys=periodKeys();return state.periodKey&&keys.includes(state.periodKey)?state.periodKey:keys.at(-1)}
+function periodBounds(key){
+ if(state.period==='month'){let d=new Date(key+'-01T12:00:00');d.setMonth(d.getMonth()+1);d.setDate(0);
+  return{start:key+'-01',end:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}}
+ if(state.period==='week')return{start:key,end:shiftDays(key,6)};
+ return{start:key,end:key}}
+function periodLabel(k){
+ if(state.period==='month')return new Date(k+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'});
+ if(state.period==='week')return 'Week of '+fmtDateY(k);
+ return new Date(k+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
+/* Data window for the active period: never runs past the last day we actually have. */
+function dates(key){let b=periodBounds(key||activePeriodKey()),e=dataEnd();return{start:b.start,end:e<b.end?e:b.end}}
+/* Pace basis: calendar-day proration, identical for a technician and for a market so the two views stay comparable. */
+function paceInfo(key){
+ if(state.period==='day')return null;
+ let k=key||activePeriodKey(),b=periodBounds(k),d=dates(k);
+ return{elapsed:spanDays(b.start,d.end),total:spanDays(b.start,b.end),partial:d.end<b.end,end:b.end}}
+function priorKey(key){let keys=periodKeys(),i=keys.indexOf(key||activePeriodKey());return i>0?keys[i-1]:null}
+/* Days elapsed in the period on screen. When that period is complete this is its full length,
+   so every "to date" window below quietly becomes the whole period and nothing is truncated. */
+function elapsedLen(){let k=activePeriodKey(),b=periodBounds(k);return spanDays(b.start,dates(k).end)}
+function windowFor(key,toDate){
+ if(!toDate)return dates(key);
+ let b=periodBounds(key),e=shiftDays(b.start,elapsedLen()-1),de=dataEnd();
+ if(e>b.end)e=b.end;if(e>de)e=de;
+ return{start:b.start,end:e}}
+function paceFor(key,toDate){
+ if(state.period==='day')return null;
+ let b=periodBounds(key),w=windowFor(key,toDate);
+ return{elapsed:spanDays(b.start,w.end),total:spanDays(b.start,b.end),partial:w.end<b.end,end:b.end}}
+function bounds(){return{min:dataStart(),max:dataEnd()}}
+function rangeDates(){let{min,max}=bounds(),m=state.range.mode;
+ if(m==='period')return dates();
+ if(m==='all')return{start:min,end:max};
+ if(m==='ytd'){let s=max.slice(0,4)+'-01-01';return{start:s<min?min:s,end:max}}
+ if(m==='custom'){let s=state.range.start||min,e=state.range.end||max;if(s>e){let t=s;s=e;e=t}return{start:s<min?min:s,end:e>max?max:e}}
+ let back={l30:30,l90:90,l180:183}[m]||90,s=shiftDays(max,-(back-1));return{start:s<min?min:s,end:max}}
+function rangeLabel(){let r=rangeDates();return fmtDateY(r.start)+' – '+fmtDateY(r.end)+' ('+spanDays(r.start,r.end)+' days)'}
+
+/* ---------- row selection ---------- */
+const empOK=r=>state.employment==='all'||r.pt_ft_tagging===state.employment;
+/* o.tech pins to one technician and deliberately ignores the employment filter, so a selected
+   technician never blanks out just because the filter above them says the other thing. */
+function rowsIn(start,end,o={}){return state.ops.filter(r=>{let d=day(r);
+ if(d<start||d>end)return false;
+ if(o.tech)return r.technician_id===o.tech;
+ if(o.market&&o.market!=='All Markets'&&r.market_name!==o.market)return false;
+ return empOK(r)})}
+function markets(){return [...new Set(state.ops.map(r=>r.market_name))].sort()}
+function techMarketOf(id){let c=new Map();state.ops.filter(r=>r.technician_id===id).forEach(r=>c.set(r.market_name,(c.get(r.market_name)||0)+1));
+ return [...c].sort((a,b)=>b[1]-a[1])[0]?.[0]||null}
+function techName(id){let r=state.ops.find(x=>x.technician_id===id);return r?r.technician_name:id}
+function techOptions(){let m=new Map();
+ state.ops.filter(r=>(state.market==='All Markets'||r.market_name===state.market)&&empOK(r)).forEach(r=>m.set(r.technician_id,r.technician_name));
+ return [...m].sort((a,b)=>a[1].localeCompare(b[1]))}
+function techsInMarket(mkt,start,end){return [...new Set(rowsIn(start,end,{market:mkt}).map(r=>r.technician_id))]}
+
+/* ---------- labor allocation ---------- */
+function allocate(){
+ let byTW=new Map();
+ state.ops.forEach((r,i)=>{r._key=i;let k=r.technician_id+'|'+week(r);(byTW.get(k)||byTW.set(k,[]).get(k)).push(r)});
+ state.allocated=[];
+ state.labor.forEach(l=>{let rs=byTW.get(l.technician_id+'|'+week(l))||[],worked=rs.filter(r=>n(r.worked_day_flag)),pool=worked.length?worked:rs;
+  pool.forEach(r=>state.allocated.push({_key:r._key,technician_id:l.technician_id,
+   hours:n(l.Hours)/pool.length,cost:n(l['Total Employer Cost'])/pool.length,fallback:!worked.length}))});
+ state.allocIndex=new Map();
+ state.allocated.forEach(a=>{(state.allocIndex.get(a._key)||state.allocIndex.set(a._key,[]).get(a._key)).push(a)})}
+function laborFor(rows){let out=[];for(let i=0;i<rows.length;i++){let a=state.allocIndex.get(rows[i]._key);if(a)for(let j=0;j<a.length;j++)out.push(a[j])}return out}
+function coverage(rows){let active=new Set(rows.filter(r=>n(r.worked_day_flag)).map(r=>r.technician_id)),
+ have=new Set(laborFor(rows).map(r=>r.technician_id));
+ return{active:active.size,matched:[...active].filter(x=>have.has(x)).length,complete:active.size>0&&[...active].every(x=>have.has(x))}}
+
+/* ---------- the one metric engine ---------- */
+function summarize(rows,opts={}){
+ let alloc=opts.alloc===undefined?['week','month'].includes(state.period):opts.alloc;
+ let sig=opts.noCache?'':JSON.stringify([rows.map(r=>r._key),alloc,opts.pace||0]);
+ if(sig&&state.cache.has(sig))return state.cache.get(sig);
+ let L=laborFor(rows),cov=coverage(rows),
+  sum=f=>rows.reduce((a,r)=>a+n(r[f]),0),
+  revenue=sum('revenue_amount'),booked=sum('booked_revenue_amount'),jobs=sum('completed_jobs_count'),
+  invoiced=sum('invoiced_jobs_count'),rotorE=sum('rotor_eligible_jobs_count'),rotorA=sum('rotor_attached_jobs_count'),
+  daysWorked=sum('worked_day_flag'),invoicedHours=sum('invoiced_minutes')/60,
+  clock=L.reduce((a,r)=>a+n(r.hours),0),
+  /* Utilization compares like with like: only days that actually carry allocated payroll feed
+     the numerator, so a week of payroll that has not landed yet cannot inflate the ratio. */
+  covered=rows.filter(r=>state.allocIndex.has(r._key)),
+  coveredInvoiced=covered.reduce((a,r)=>a+n(r.invoiced_minutes),0)/60,
+  coveredDays=covered.reduce((a,r)=>a+n(r.worked_day_flag),0),
+  laborOK=clock>0;
+ let out={revenue,jobs,daysWorked,invoicedHours,activeTechs:cov.active,
+  avgTicket:invoiced?revenue/invoiced:null,
+  ticketCompletion:booked?revenue/booked:null,
+  rotorAttach:rotorE?rotorA/rotorE:null,
+  serviceRate:jobs?sum('service_call_jobs_count')/jobs:null,
+  jobsPerDay:daysWorked?jobs/daysWorked:null,
+  revenuePerDay:daysWorked?revenue/daysWorked:null,
+  clockedHours:laborOK?clock:null,
+  invoicedHoursMatched:laborOK?coveredInvoiced:null,
+  utilization:laborOK?coveredInvoiced/clock:null,
+  revenuePace:null,jobsPace:null,
+  coveredDays,laborCoverage:daysWorked?coveredDays/daysWorked:null,
+  coverage:cov,partialLabor:laborOK&&!cov.complete};
+ if(opts.pace&&opts.pace.elapsed){out.revenuePace=revenue/opts.pace.elapsed*opts.pace.total;out.jobsPace=jobs/opts.pace.elapsed*opts.pace.total}
+ if(sig)state.cache.set(sig,out);return out}
+
+/* ---------- heat map ---------- */
+function heatBg(v,vals,dir){
+ if(!dir||v==null||!Number.isFinite(v))return '';
+ let f=vals.filter(x=>Number.isFinite(x));if(f.length<2)return '';
+ if(Math.min(...f)===Math.max(...f))return '';
+ let below=f.filter(x=>x<v).length,equal=f.filter(x=>x===v).length,
+  t=((below+equal/2)/f.length-.5)*2*dir,step=Math.round(Math.abs(t)*4);
+ return step?'background:var(--heat-'+(t>0?'g':'r')+step+')':''}
+function heatLegend(){return '<span class="legend"><span>Weaker</span><i style="background:var(--heat-r4)"></i><i style="background:var(--heat-r2)"></i><i style="background:#f8fafc"></i><i style="background:var(--heat-g2)"></i><i style="background:var(--heat-g4)"></i><span>Stronger</span></span>'}
+function toggleBtn(id,on,label){return '<button class="toggle" data-toggle="'+id+'" aria-pressed="'+(!!on)+'"><i class="dot"></i>'+label+'</button>'}
+
+/* ---------- scope + benchmark ------------------------------------------------
+   scope   = what the cards are measuring (one technician, or one market)
+   bench   = the context we hold it against (its market, or the average market)
+   ---------------------------------------------------------------------------*/
+function scopeOpts(){return state.view==='tech'?{tech:state.tech}:{market:state.market}}
+function scopeRows(key){let d=dates(key);return rowsIn(d.start,d.end,scopeOpts())}
+function benchInfo(){
+ if(state.view==='tech'){let m=techMarketOf(state.tech);
+  return m?{opts:{market:m},label:m+' avg / tech',divisor:'techs',market:m}:null}
+ return state.market==='All Markets'?null:{opts:{market:'All Markets'},label:'Average market',divisor:'markets'}}
+function benchSummary(key){let b=benchInfo();if(!b)return null;
+ let d=dates(key),rows=rowsIn(d.start,d.end,b.opts),s=summarize(rows,{pace:paceInfo(key)});
+ let div=b.divisor==='techs'?s.activeTechs:new Set(rows.map(r=>r.market_name)).size;
+ return{info:b,s,div:div||1}}
+function benchValue(k,bs){if(!bs)return null;let v=bs.s[k];if(v==null)return null;
+ return METRICS[k].perTech?v/bs.div:v}
+/* Rank is only meaningful for one technician inside their own market. */
+function ranks(){
+ if(state.view!=='tech'||!state.tech)return null;
+ let m=techMarketOf(state.tech);if(!m)return null;
+ let d=dates(),ids=techsInMarket(m,d.start,d.end),pace=paceInfo(),
+  vals=ids.map(id=>({id,s:summarize(rowsIn(d.start,d.end,{tech:id}),{pace})})),out={market:m,total:ids.length};
+ RANKED.concat(['revenuePace']).forEach(k=>{
+  let dir=METRICS[k].dir||1,
+   list=vals.filter(x=>Number.isFinite(x.s[k])).sort((a,b)=>dir<0?a.s[k]-b.s[k]:b.s[k]-a.s[k]),
+   i=list.findIndex(x=>x.id===state.tech);
+  out[k]=i<0?null:{place:i+1,of:list.length}});
+ return out}
+
+/* ---------- shell ---------- */
+function controls(){
+ let d=dates(),key=activePeriodKey(),keys=periodKeys().reverse(),opts=techOptions(),
+  cov=coverage(scopeRows()),pace=paceInfo(),
+  hasEmp=state.ops.some(r=>r.pt_ft_tagging),
+  who=state.view==='tech'?(state.tech?techName(state.tech):'No technician selected'):(state.market==='All Markets'?'All markets':state.market);
+ let s=summarize(scopeRows(),{pace}),
+  lagNote=s.laborCoverage!=null&&s.laborCoverage<.999
+   ?' <strong class="warnish">Payroll currently covers '+num(s.coveredDays,'number')+' of '+num(s.daysWorked,'number')+' worked days in this view</strong> — utilization and clocked hours are measured only over the covered days, so they stay accurate while the rest of the week catches up.':'';
+ let tdNote=pace&&pace.partial?'<div class="notice small"><strong>This '+state.period+' is still in progress — '+pace.elapsed+' of '+pace.total+' days.</strong> Every card compares it against the first '+pace.elapsed+' days of the prior '+state.period+' and each sparkline point covers the same '+pace.elapsed+' days, so nothing on this page reads a partial '+state.period+' against a complete one. The period history table below is the exception: it deliberately shows each '+state.period+' in full.</div>':'';
+ let periodNote=tdNote+'<div class="notice small"><strong>Labor is allocated from weekly payroll.</strong> Each technician’s weekly hours are split evenly across the days they worked in that week, then only the days inside the selected period are counted.'+lagNote+'</div>';
+ return '<div class="top"><div><h1 class="title">NuBrakes Technician Dashboard</h1>'+
+ '<p class="subtitle">'+esc(who)+' · '+periodLabel(key)+' · data through '+fmtDateY(d.end)+(pace&&pace.partial?' (period in progress)':'')+'</p></div>'+
+ '<div class="status-row"><span class="badge live"><i class="badge-dot"></i>Live Data</span>'+
+ '<span class="coverage">Payroll coverage: '+cov.matched+'/'+cov.active+'</span></div></div>'+
+ '<div class="viewswitch" role="tablist">'+
+  [['tech','Technician View'],['market','Market View']].map(([k,l])=>'<button role="tab" aria-selected="'+(state.view===k)+'" class="'+(state.view===k?'active':'')+'" data-view="'+k+'">'+l+'</button>').join('')+
+ '</div>'+
+ '<div class="toolbar">'+
+ '<label class="field">Market<select class="select" id="market"><option>All Markets</option>'+markets().map(x=>'<option'+(x===state.market?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></label>'+
+ (state.view==='tech'?'<label class="field">Technician<select class="select primary" id="tech">'+
+   (opts.length?'':'<option value="">No technicians in this filter</option>')+
+   opts.map(([id,nm])=>'<option value="'+esc(id)+'"'+(id===state.tech?' selected':'')+'>'+esc(nm)+'</option>').join('')+'</select></label>':'')+
+ '<label class="field">View by<select class="select" id="period">'+[['month','Month'],['week','Week'],['day','Day']].map(([v,l])=>'<option value="'+v+'"'+(state.period===v?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
+ '<label class="field">Select '+state.period+'<select class="select" id="periodKey">'+keys.map(k=>'<option value="'+k+'"'+(k===key?' selected':'')+'>'+periodLabel(k)+'</option>').join('')+'</select></label>'+
+ (hasEmp?'<label class="field">Employment<select class="select" id="employment">'+[['all','All techs'],['FT','Full-time'],['PT','Part-time']].map(([v,l])=>'<option value="'+v+'"'+(state.employment===v?' selected':'')+'>'+l+'</option>').join('')+'</select></label>':'')+
+ '</div>'+periodNote}
+
+/* ---------- KPI cards ---------- */
+function cardLabel(k,cur){let m=METRICS[k],p=paceInfo();
+ if(k==='revenue')return state.period==='month'?(p&&p.partial?'Month-to-Date Revenue':'Revenue'):(state.period==='week'&&p&&p.partial?'Week-to-Date Revenue':'Revenue');
+ if(k==='invoicedHoursMatched'&&cur&&cur.laborCoverage!=null&&cur.laborCoverage<.999)return m.label+MATCHED_SUFFIX;
+ return m.label}
+function deltaSpan(cur,prior,k){
+ let m=METRICS[k];if(cur==null||prior==null)return '<span class="delta flat">—</span>';
+ let d=cur-prior,cl=!m.dir?'flat':(d*m.dir>0?'up':d===0?'flat':'down');
+ return '<span class="delta '+cl+'">'+(d>=0?'+':'')+num(d,m.format)+'</span>'}
+function rankPill(r){if(!r)return '<span class="rankpill">—</span>';
+ let q=r.place/r.of,cl=q<=.34?'top':q>=.75?'low':'';
+ return '<span class="rankpill '+cl+'">'+r.place+' of '+r.of+'</span>'}
+function card(k,cur,prior,bs,rk){
+ let m=METRICS[k],v=cur[k],p=prior?prior[k]:null,b=benchValue(k,bs),
+  periodWord=(state.period==='month'?'month':state.period==='week'?'week':'day')+(paceInfo()&&paceInfo().partial?' to date':'');
+ return '<div class="card'+(HERO.has(k)?' hero':'')+'" title="'+esc(m.description||m.formula)+'">'+
+ '<div class="metric">'+cardLabel(k,cur)+(HERO.has(k)?'<span class="tag">PRIMARY</span>':'')+'</div>'+
+ '<div class="value">'+num(v,m.format)+'</div>'+
+ '<div class="spark-wrap"><canvas class="sparkline" data-spark="'+k+'" role="img" aria-label="'+esc(m.label)+' trend"></canvas></div>'+
+ '<div class="rows">'+
+  '<div class="row"><span>Prior '+periodWord+'</span><span><b>'+num(p,m.format)+'</b> '+deltaSpan(v,p,k)+'</span></div>'+
+  (bs?'<div class="row"><span>'+esc(bs.info.label)+'</span><span><b>'+num(b,m.format)+'</b> '+deltaSpan(v,b,k)+'</span></div>':'')+
+  (rk&&rk[k]!==undefined?'<div class="row"><span>Rank in '+esc(rk.market)+'</span>'+rankPill(rk[k])+'</div>':'')+
+  (m.requiresLabor&&cur.laborCoverage!=null&&cur.laborCoverage<.999
+   ?'<div class="row"><span>Payroll covers</span><b class="warnish">'+num(cur.coveredDays,'number')+' of '+num(cur.daysWorked,'number')+' days</b></div>':'')+
+ '</div></div>'}
+function kpiCards(){
+ let key=activePeriodKey(),pace=paceInfo(),pk=priorKey(key),
+  cur=summarize(scopeRows(key),{pace}),
+  pw=pk?windowFor(pk,true):null,
+  prior=pk?summarize(rowsIn(pw.start,pw.end,scopeOpts()),{pace:paceFor(pk,true),noCache:true}):null,
+  bs=benchSummary(key),rk=ranks();
+ return GROUPS.map(([nm,hint,ks])=>{
+  let cols=ks.filter(k=>!(k==='revenuePace'&&!pace));
+  return '<div class="kpi-group"><div class="group-name">'+nm+'<em>'+hint+'</em></div><div class="cards">'+
+   cols.map(k=>card(k,cur,prior,bs,rk)).join('')+'</div></div>'}).join('')}
+
+/* ---------- technician view ---------- */
+function techIdCard(){
+ let d=dates(),rows=scopeRows(),s=summarize(rows,{pace:paceInfo()}),r0=rows[0],
+  mkt=techMarketOf(state.tech)||'—',emp=r0&&r0.pt_ft_tagging?r0.pt_ft_tagging==='FT'?'Full-time':'Part-time':'—',
+  rk=ranks();
+ return '<div class="idcard"><div class="avatar">'+esc(initials(techName(state.tech)))+'</div>'+
+ '<div><p class="idname">'+esc(techName(state.tech))+'</p>'+
+ '<p class="idmeta">'+esc(mkt)+' · '+emp+' · '+periodLabel(activePeriodKey())+(rk?' · '+rk.total+' technicians in market':'')+'</p></div>'+
+ '<div class="idstats">'+
+  [['Days worked',num(s.daysWorked,'number')],['Revenue',num(s.revenue,'currency')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Utilization',num(s.utilization,'percent')]]
+  .map(([l,v])=>'<div class="idstat"><b>'+v+'</b><span>'+l+'</span></div>').join('')+
+ '</div></div>'}
+function historyTable(){
+ let keys=periodKeys().filter(k=>k<=activePeriodKey()).slice(-state.historyN).reverse(),
+  cur=activePeriodKey(),partial=!!(paceInfo()&&paceInfo().partial),
+  data=keys.map(k=>Object.assign({key:k,partial:partial&&k===cur},summarize(rowsIn(dates(k).start,dates(k).end,scopeOpts()),{pace:paceFor(k),noCache:true}))),
+  heat={};HISTORY_COLS.forEach(k=>{if(!METRICS[k].dir)return;
+   heat[k]=(LENGTH_SENSITIVE.has(k)?data.filter(x=>!x.partial):data).map(x=>x[k])});
+ return '<section class="section"><div class="sec-head"><div><h2>Period history</h2>'+
+ '<p class="small">The last '+keys.length+' '+state.period+'s for this technician, newest first, each shown in full. Shading ranks each column against this technician’s own history, so it reads as a trend rather than a comparison with anyone else.'+
+ (paceInfo()&&paceInfo().partial?' <span class="warnish">The top row covers only '+paceInfo().elapsed+' of '+paceInfo().total+' days, so its running totals are left unshaded — rates beside them are period-length independent and still rank normally.</span>':'')+'</p></div>'+
+ '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
+ '<div class="scroll"><table><thead><tr><th class="pin txt">Period</th>'+HISTORY_COLS.map(k=>'<th>'+METRICS[k].short+'</th>').join('')+'</tr></thead><tbody>'+
+ data.map(x=>'<tr'+(x.key===activePeriodKey()?' class="me"':'')+'><td class="pin txt">'+periodLabel(x.key)+'</td>'+
+  HISTORY_COLS.map(k=>{let skip=x.partial&&LENGTH_SENSITIVE.has(k),
+    bg=state.heat&&!skip?heatBg(x[k],heat[k],METRICS[k].dir):'';
+   return '<td class="'+(bg?'heat':'')+'" style="'+bg+'"'+(skip?' title="Period still in progress — not ranked against complete '+state.period+'s"':'')+'>'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
+ '</tbody></table></div></section>'}
+function techView(){
+ if(!state.tech)return '<div class="notice">Pick a technician above to load their scorecard. Adjust the market or employment filter if the one you want is not listed.</div>';
+ return techIdCard()+kpiCards()+trendSection()+historyTable()+peerTable()+definitions()}
+/* Where the technician sits among their peers for the same period. */
+function peerTable(){
+ let m=techMarketOf(state.tech);if(!m)return '';
+ let d=dates(),pace=paceInfo(),ids=techsInMarket(m,d.start,d.end),
+  data=ids.map(id=>Object.assign({id,name:techName(id)},summarize(rowsIn(d.start,d.end,{tech:id}),{pace}))),
+  sk=state.sort.key;
+ data.sort((a,b)=>typeof a[sk]==='string'?state.sort.dir*String(a[sk]).localeCompare(String(b[sk])):state.sort.dir*((a[sk]??-Infinity)-(b[sk]??-Infinity)));
+ let heat={};TECH_COLS.forEach(k=>{if(METRICS[k].dir)heat[k]=data.map(x=>x[k])});
+ let mktRow=summarize(rowsIn(d.start,d.end,{market:m}),{pace,noCache:true});
+ return '<section class="section"><div class="sec-head"><div><h2>'+esc(m)+' peer group</h2>'+
+ '<p class="small">Every technician who worked in '+esc(m)+' this period. The selected technician is bolded. Click any name to switch the scorecard to them.</p></div>'+
+ '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
+ '<div class="scroll"><table><thead><tr><th class="pin txt" data-sort="name">Technician</th>'+
+  TECH_COLS.map(k=>'<th data-sort="'+k+'">'+METRICS[k].short+' '+(state.sort.key===k?(state.sort.dir===1?'↑':'↓'):'↕')+'</th>').join('')+'</tr></thead><tbody>'+
+ data.map(x=>'<tr'+(x.id===state.tech?' class="me"':'')+'><td class="pin link" data-tech="'+esc(x.id)+'">'+esc(x.name)+'</td>'+
+  TECH_COLS.map(k=>{let bg=state.heat?heatBg(x[k],heat[k],METRICS[k].dir):'';
+   return '<td class="'+(bg?'heat':'')+'" style="'+bg+'">'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
+ '</tbody><tfoot><tr><td class="pin txt">'+esc(m)+' overall</td>'+
+  TECH_COLS.map(k=>'<td>'+num(mktRow[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'}
+
+/* ---------- market view ---------- */
+function marketIdCard(){
+ let s=summarize(scopeRows(),{pace:paceInfo()}),name=state.market==='All Markets'?'All Markets':state.market;
+ return '<div class="idcard"><div class="avatar mkt">'+esc(initials(name==='All Markets'?'ALL':name))+'</div>'+
+ '<div><p class="idname">'+esc(name)+'</p>'+
+ '<p class="idmeta">'+periodLabel(activePeriodKey())+' · '+num(s.activeTechs,'number')+' active technicians · '+num(s.daysWorked,'number')+' technician-days worked</p></div>'+
+ '<div class="idstats">'+
+  [['Revenue',num(s.revenue,'currency')],['Jobs',num(s.jobs,'number')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Utilization',num(s.utilization,'percent')]]
+  .map(([l,v])=>'<div class="idstat"><b>'+v+'</b><span>'+l+'</span></div>').join('')+
+ '</div></div>'}
+function marketTable(){
+ let d=dates(),pace=paceInfo(),
+  data=markets().map(m=>Object.assign({market:m},summarize(rowsIn(d.start,d.end,{market:m}),{pace}))),
+  heat={};MARKET_COLS.forEach(k=>{if(METRICS[k].dir)heat[k]=data.map(x=>x[k])});
+ let all=summarize(rowsIn(d.start,d.end,{market:'All Markets'}),{pace,noCache:true});
+ return '<section class="section"><div class="sec-head"><div><h2>All markets</h2>'+
+ '<p class="small">Every market for the selected period, so a single market can be read against the network. Click a market to load it above.</p></div>'+
+ '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
+ '<div class="scroll"><table><thead><tr><th class="pin txt">Market</th>'+MARKET_COLS.map(k=>'<th>'+METRICS[k].short+'</th>').join('')+'</tr></thead><tbody>'+
+ data.map(x=>'<tr'+(x.market===state.market?' class="me"':'')+'><td class="pin link" data-market="'+esc(x.market)+'">'+esc(x.market)+'</td>'+
+  MARKET_COLS.map(k=>{let bg=state.heat?heatBg(x[k],heat[k],METRICS[k].dir):'';
+   return '<td class="'+(bg?'heat':'')+'" style="'+bg+'">'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
+ '</tbody><tfoot><tr><td class="pin txt">Network</td>'+MARKET_COLS.map(k=>'<td>'+num(all[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'}
+function leaderboard(){
+ let d=dates(),pace=paceInfo(),rows=rowsIn(d.start,d.end,{market:state.market}),
+  ids=[...new Set(rows.map(r=>r.technician_id))],
+  data=ids.map(id=>{let rs=rowsIn(d.start,d.end,{tech:id}).filter(r=>state.market==='All Markets'||r.market_name===state.market);
+   return Object.assign({id,name:techName(id),market:techMarketOf(id)},summarize(rs,{pace}))}),
+  sk=state.sort.key;
+ data.sort((a,b)=>typeof a[sk]==='string'?state.sort.dir*String(a[sk]).localeCompare(String(b[sk])):state.sort.dir*((a[sk]??-Infinity)-(b[sk]??-Infinity)));
+ let heat={};TECH_COLS.forEach(k=>{if(METRICS[k].dir)heat[k]=data.map(x=>x[k])});
+ let agg=summarize(rows,{pace,noCache:true});
+ return '<section class="section"><div class="sec-head"><div><h2>Technician leaderboard</h2>'+
+ '<p class="small">Every technician in '+esc(state.market==='All Markets'?'the network':state.market)+' for this period, sortable on any column. Shading ranks each column across the technicians shown; volume-driven columns are left unshaded. Click a name to open their scorecard in Technician View.</p></div>'+
+ '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
+ '<div class="scroll"><table><thead><tr><th class="pin txt" data-sort="name">Technician</th><th class="txt">Market</th>'+
+  TECH_COLS.map(k=>'<th data-sort="'+k+'">'+METRICS[k].short+' '+(state.sort.key===k?(state.sort.dir===1?'↑':'↓'):'↕')+'</th>').join('')+'</tr></thead><tbody>'+
+ data.map(x=>'<tr><td class="pin link" data-tech="'+esc(x.id)+'">'+esc(x.name)+'</td><td class="txt">'+esc(x.market||'—')+'</td>'+
+  TECH_COLS.map(k=>{let bg=state.heat?heatBg(x[k],heat[k],METRICS[k].dir):'';
+   return '<td class="'+(bg?'heat':'')+'" style="'+bg+'">'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
+ '</tbody><tfoot><tr><td class="pin txt">'+esc(state.market==='All Markets'?'Network':state.market)+' overall</td><td></td>'+
+  TECH_COLS.map(k=>'<td>'+num(agg[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'+
+ (data.length?'':'<p class="small">No technician activity in this selection.</p>')}
+function marketView(){return marketIdCard()+kpiCards()+trendSection()+leaderboard()+marketTable()+definitions()}
+
+/* ---------- trend ---------- */
+function rangeControl(){let{min,max}=bounds(),r=rangeDates();
+ return '<div class="rangebar"><div class="seg">'+RANGES.map(([k,l])=>'<button class="'+(state.range.mode===k?'active':'')+'" data-range="'+k+'">'+l+'</button>').join('')+'</div>'+
+ (state.range.mode==='custom'?'<label class="field">Start<input type="date" id="rangeStart" min="'+min+'" max="'+max+'" value="'+r.start+'"></label><label class="field">End<input type="date" id="rangeEnd" min="'+min+'" max="'+max+'" value="'+r.end+'"></label>':'')+
+ '<span class="chip">'+rangeLabel()+'</span></div>'}
+function bucketKey(r,g){return g==='monthly'?day(r).slice(0,7):g==='weekly'?week(r):day(r)}
+function bucketLabel(k,g){return g==='monthly'?new Date(k+'-01T12:00:00').toLocaleDateString(undefined,{month:'short',year:'2-digit'}):g==='weekly'?fmtDate(k):fmtDate(k)}
+function bucketize(rows,g){let m=new Map();rows.forEach(r=>{let k=bucketKey(r,g);(m.get(k)||m.set(k,[]).get(k)).push(r)});return m}
+function trendSection(){
+ let m=METRICS[state.trendMetric],b=benchInfo();
+ return '<section class="section"><div class="sec-head"><div><h2>'+m.label+' over time</h2>'+
+ '<p class="small">'+rangeLabel()+' · '+GRAINS.find(g=>g[0]===state.granularity)[1].toLowerCase()+' buckets'+
+ (b?' · dashed line is '+esc(b.label):'')+
+ (state.granularity==='daily'&&m.requiresLabor?' · utilization is blank at daily granularity because payroll arrives weekly':'')+'</p></div>'+
+ '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="field">KPI<select class="select" id="trendMetric">'+
+  TREND_METRICS.map(k=>'<option value="'+k+'"'+(k===state.trendMetric?' selected':'')+'>'+METRICS[k].label+'</option>').join('')+'</select></label>'+
+ '<div class="seg">'+GRAINS.map(([k,l])=>'<button class="'+(state.granularity===k?'active':'')+'" data-gran="'+k+'">'+l+'</button>').join('')+'</div>'+
+ toggleBtn('trendLabels',state.trendLabels,'Data labels')+'</div></div>'+
+ rangeControl()+'<div class="chart-wrap"><canvas id="trendChart"></canvas></div><div id="trendFallback" class="hidden"></div></section>'}
+const valueLabels={id:'valueLabels',afterDatasetsDraw(chart,args,opts){
+ if(!opts||!opts.show)return;let ctx=chart.ctx;ctx.save();ctx.font='600 10px Inter, system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+ chart.data.datasets.forEach((ds,di)=>{let meta=chart.getDatasetMeta(di);if(meta.hidden)return;let els=meta.data||[];if(!els.length)return;
+  let step=1;if(els.length>1){let gap=Math.abs(els[els.length-1].x-els[0].x)/(els.length-1);step=Math.max(1,Math.ceil(44/Math.max(gap,1)))}
+  els.forEach((el,i)=>{let v=ds.data[i];if(v==null||!Number.isFinite(v))return;if(i%step&&i!==els.length-1)return;
+   let text=numShort(v,opts.format);if(!text)return;let y=el.y-7;if(y<14)y=el.y+18;
+   ctx.lineWidth=3;ctx.strokeStyle='#ffffff';ctx.strokeText(text,el.x,y);ctx.fillStyle=ds.borderColor||'#374151';ctx.fillText(text,el.x,y)})});
+ ctx.restore()}};
+function drawTrend(){
+ let host=document.querySelector('#trendChart');if(!host)return;
+ let{start,end}=rangeDates(),g=state.granularity,m=METRICS[state.trendMetric],alloc=g!=='daily',
+  scope=bucketize(rowsIn(start,end,scopeOpts()),g),
+  b=benchInfo(),bench=b?bucketize(rowsIn(start,end,b.opts),g):null,
+  keys=[...new Set([...scope.keys()].concat(bench?[...bench.keys()]:[]))].sort(),
+  vals=keys.map(k=>scope.has(k)?summarize(scope.get(k),{alloc,noCache:true})[state.trendMetric]:null),
+  bvals=bench?keys.map(k=>{if(!bench.has(k))return null;let rs=bench.get(k),s=summarize(rs,{alloc,noCache:true}),v=s[state.trendMetric];
+   if(v==null)return null;if(!m.perTech)return v;
+   let div=b.divisor==='techs'?s.activeTechs:new Set(rs.map(r=>r.market_name)).size;return div?v/div:null}):null;
+ let fb=document.querySelector('#trendFallback');
+ if(!window.Chart){fb.classList.remove('hidden');
+  fb.innerHTML='<div class="scroll"><table class="fallback"><thead><tr><th class="txt">Period</th><th>'+m.short+'</th>'+(b?'<th>'+esc(b.label)+'</th>':'')+'</tr></thead><tbody>'+
+   keys.map((x,i)=>'<tr><td class="txt">'+bucketLabel(x,g)+'</td><td>'+num(vals[i],m.format)+'</td>'+(b?'<td>'+num(bvals[i],m.format)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>';return}
+ fb.classList.add('hidden');trendChart&&trendChart.destroy();
+ let scopeLabel=state.view==='tech'?techName(state.tech):(state.market==='All Markets'?'All markets':state.market),
+  datasets=[{label:scopeLabel,data:vals,borderColor:'#4a3aa7',backgroundColor:'rgba(74,58,167,.10)',borderWidth:2.25,fill:true,tension:.25,spanGaps:true,
+   pointRadius:keys.length>60?0:3,pointHoverRadius:6,pointBackgroundColor:'#4a3aa7',pointBorderColor:'#fff',pointBorderWidth:1.5}];
+ if(b)datasets.push({label:b.label,data:bvals,borderColor:'#FF6B35',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],fill:false,tension:.25,spanGaps:true,
+   pointRadius:0,pointHoverRadius:5,pointBackgroundColor:'#FF6B35',pointBorderColor:'#fff'});
+ trendChart=new Chart(host,{type:'line',plugins:[valueLabels],data:{labels:keys.map(k=>bucketLabel(k,g)),datasets},
+  options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22,right:10}},interaction:{mode:'index',intersect:false},
+   scales:{x:{grid:{display:false},ticks:{color:'#6b7280',maxRotation:0,autoSkip:true,font:{size:11}}},
+    y:{grid:{color:'#f1f5f9'},border:{display:false},ticks:{color:'#6b7280',font:{size:11},callback:v=>numShort(v,m.format)}}},
+   plugins:{legend:{display:true,position:'top',align:'start',labels:{boxWidth:12,boxHeight:2,usePointStyle:false,color:'#374151',font:{size:11}}},
+    valueLabels:{show:state.trendLabels,format:m.format},
+    tooltip:{callbacks:{label:c=>c.dataset.label+': '+num(c.parsed.y,m.format)}}}}})}
+
+/* ---------- sparklines ---------- */
+/* Every point covers the same number of days as the period on screen, so a month still in
+   progress does not read as a collapse against six complete months behind it. */
+function sparkSeries(key){
+ let keys=periodKeys().filter(k=>k<=activePeriodKey()).slice(-8);
+ return{keys,values:keys.map(k=>{let w=windowFor(k,true);
+  return summarize(rowsIn(w.start,w.end,scopeOpts()),{pace:paceFor(k,true),noCache:true})[key]})}}
+function drawSparklines(){
+ document.querySelectorAll('.sparkline').forEach(canvas=>{
+  let key=canvas.dataset.spark,s=sparkSeries(key),values=s.values,finite=values.filter(Number.isFinite),
+   ratio=window.devicePixelRatio||1,w=canvas.clientWidth,h=30;
+  if(!w){requestAnimationFrame(drawSparklines);return}
+  canvas.width=w*ratio;canvas.height=h*ratio;let ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#eef2f7';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h-4);ctx.lineTo(w,h-4);ctx.stroke();
+  if(!finite.length){ctx.fillStyle='#9ca3af';ctx.font='10px system-ui';ctx.fillText('No trend data',2,18);return}
+  let min=Math.min(...finite),max=Math.max(...finite),spread=max-min||Math.abs(max)||1,
+   x=i=>s.keys.length===1?w/2:i*(w-4)/(s.keys.length-1)+2,y=v=>h-5-(v-min)/spread*(h-10),
+   dir=METRICS[key].dir,first=finite[0],last=finite[finite.length-1],
+   color=!dir?'#4a3aa7':((last-first)*dir>=0?'#047857':'#be123c');
+  ctx.strokeStyle=color;ctx.lineWidth=1.75;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+  let drawing=false;
+  values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return}if(!drawing){ctx.moveTo(x(i),y(v));drawing=true}else ctx.lineTo(x(i),y(v))});
+  ctx.stroke();
+  let li=values.findLastIndex(Number.isFinite);
+  if(li>=0){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(li),y(values[li]),2.6,0,Math.PI*2);ctx.fill()}
+  let p=paceInfo();
+  canvas.title=METRICS[key].label+': last '+s.keys.length+' '+state.period+'s ('+s.keys[0]+' → '+s.keys.at(-1)+')'+
+   (p&&p.partial?', each measured over the first '+p.elapsed+' days':'')})}
+
+/* ---------- definitions ---------- */
+function definitions(){let dirLabel=d=>d>0?'Higher is better':d<0?'Lower is better':'Volume-driven — not shaded';
+ return '<section class="section"><details class="defs"><summary>Metric definitions — how every number on this page is calculated</summary>'+
+ '<p class="small" style="margin:8px 0 12px">All calculations come from one shared registry, and the same registry drives the heat-map direction on every table. Revenue is invoiced revenue; booked revenue only ever appears in the denominator of Ticket Completion Rate.</p>'+
+ '<div class="scroll"><table class="definition"><thead><tr><th class="txt">Metric</th><th class="txt">Formula</th><th class="txt">Source fields</th><th class="txt">Direction</th><th class="txt">Notes</th></tr></thead><tbody>'+
+ Object.values(METRICS).map(m=>'<tr><td class="txt"><b>'+esc(m.label)+'</b></td><td class="txt">'+esc(m.formula)+'</td><td class="txt">'+esc(m.fields)+'</td><td class="txt">'+dirLabel(m.dir)+'</td><td class="txt">'+esc(m.description||'—')+'</td></tr>').join('')+
+ '</tbody></table></div></details></section>'}
+
+/* ---------- wiring ---------- */
+function on(sel,ev,fn){let el=document.querySelector(sel);if(el)el[ev]=fn}
+/* Keep the technician selection legal whenever the market or employment filter moves. */
+function reconcileTech(){
+ let opts=techOptions().map(x=>x[0]);
+ if(state.tech&&opts.includes(state.tech))return;
+ state.tech=opts.length?defaultTech(opts):'' }
+function defaultTech(ids){
+ let d=dates(),best=null,bestRev=-Infinity;
+ ids.forEach(id=>{let rev=rowsIn(d.start,d.end,{tech:id}).reduce((a,r)=>a+n(r.revenue_amount),0);
+  if(rev>bestRev){bestRev=rev;best=id}});
+ return best||ids[0]}
+function wire(){
+ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;if(state.view==='tech')reconcileTech();render()});
+ on('#market','onchange',e=>{state.market=e.target.value;reconcileTech();render()});
+ on('#tech','onchange',e=>{state.tech=e.target.value;render()});
+ on('#period','onchange',e=>{state.period=e.target.value;state.periodKey='';render()});
+ on('#periodKey','onchange',e=>{state.periodKey=e.target.value;render()});
+ on('#employment','onchange',e=>{state.employment=e.target.value;reconcileTech();render()});
+ document.querySelectorAll('[data-tech]').forEach(x=>x.onclick=()=>{
+  state.tech=x.dataset.tech;let m=techMarketOf(state.tech);
+  if(m&&state.market!=='All Markets'&&state.market!==m)state.market=m;
+  state.view='tech';window.scrollTo({top:0,behavior:'instant'});render()});
+ document.querySelectorAll('[data-market]').forEach(x=>x.onclick=()=>{state.market=x.dataset.market;state.view='market';window.scrollTo({top:0,behavior:'instant'});render()});
+ document.querySelectorAll('[data-sort]').forEach(x=>x.onclick=()=>{let k=x.dataset.sort;
+  state.sort={key:k,dir:state.sort.key===k?-state.sort.dir:(k==='name'?1:-1)};render()});
+ document.querySelectorAll('[data-gran]').forEach(x=>x.onclick=()=>{state.granularity=x.dataset.gran;render()});
+ document.querySelectorAll('[data-range]').forEach(x=>x.onclick=()=>{let m=x.dataset.range;
+  if(m==='custom'&&!state.range.start){let r=rangeDates();state.range.start=r.start;state.range.end=r.end}
+  state.range.mode=m;render()});
+ on('#rangeStart','onchange',e=>{state.range.start=e.target.value;render()});
+ on('#rangeEnd','onchange',e=>{state.range.end=e.target.value;render()});
+ on('#trendMetric','onchange',e=>{state.trendMetric=e.target.value;render()});
+ document.querySelectorAll('[data-toggle]').forEach(x=>x.onclick=()=>{
+  let k=x.dataset.toggle;if(k==='trendLabels')state.trendLabels=!state.trendLabels;else state.heat=!state.heat;render()})}
+/* Canvases carry an intrinsic pixel size, so both the sparklines and Chart.js need a nudge
+   whenever the window changes width or they render at the wrong resolution. */
+let resizeTimer;
+window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(drawSparklines,120)});
+function render(){
+ state.cache.clear();
+ document.querySelector('#app').innerHTML='<div class="app-inner">'+controls()+(state.view==='tech'?techView():marketView())+'</div>';
+ wire();drawSparklines();drawTrend()}
+async function load(){
+ let get=(a,b)=>fetch(a,{cache:'no-cache'}).then(r=>r.ok?r.json():Promise.reject(0)).catch(()=>fetch(b,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(a);return r.json()}));
+ try{
+  let res=await Promise.all([get(OPS_URL,OPS_FALLBACK),get(LABOR_URL,LABOR_FALLBACK)]);
+  state.ops=res[0];state.labor=res[1];
+  if(!state.ops.length)throw new Error(OPS_URL+' returned no rows');
+  if(!state.ops.some(r=>r.pt_ft_tagging))state.employment='all';
+  allocate();reconcileTech();render()}
+ catch(e){document.querySelector('#app').innerHTML='<div class="notice"><h2>Unable to load dashboard data</h2>'+
+  '<p>Failed feed: '+esc(String(e&&e.message||e))+'. Check your connection and retry.</p>'+
+  '<p class="small">Operations: '+OPS_URL+'<br>Labor: '+LABOR_URL+'</p>'+
+  '<button class="btn" onclick="location.reload()">Retry</button></div>'}}
+load();
+</script>
+</body></html>

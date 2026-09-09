@@ -95,6 +95,10 @@ tfoot td.pin{z-index:2;background:#fbfbfd}
 .notice{max-width:1320px;margin:auto;padding:18px;border-radius:12px;background:#fff;border:1px solid var(--border);color:var(--muted)}
 .notice.small{margin-bottom:16px;padding:10px 14px}
 .chart-wrap{height:360px}
+.empty{background:var(--card);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow);padding:44px 28px;text-align:center;max-width:680px;margin:8px auto 16px}
+.empty-icon{width:46px;height:46px;border-radius:999px;margin:0 auto 14px;background:#eef2ff;color:var(--deep);display:flex;align-items:center;justify-content:center;font-size:20px}
+.empty h2{font-size:16px;margin:0 0 8px}
+.empty .small{max-width:52ch;margin:0 auto 8px}
 .warnish{color:#c2410c}
 .small{font-size:11px;color:var(--muted);line-height:1.5}
 .btn{padding:6px 12px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#374151}
@@ -332,7 +336,9 @@ function toggleBtn(id,on,label){return '<button class="toggle" data-toggle="'+id
    bench   = the context we hold it against (its market, or the average market)
    ---------------------------------------------------------------------------*/
 function scopeOpts(){return state.view==='tech'?{tech:state.tech}:{market:state.market}}
-function scopeRows(key){let d=dates(key);return rowsIn(d.start,d.end,scopeOpts())}
+function scopeRows(key){
+ if(state.view==='tech'&&!state.tech)return [];
+ let d=dates(key);return rowsIn(d.start,d.end,scopeOpts())}
 function benchInfo(){
  if(state.view==='tech'){let m=techMarketOf(state.tech);
   return m?{opts:{market:m},label:m+' avg / tech',divisor:'techs',market:m}:null}
@@ -361,12 +367,13 @@ function controls(){
  let d=dates(),key=activePeriodKey(),keys=periodKeys().reverse(),opts=techOptions(),
   cov=coverage(scopeRows()),pace=paceInfo(),
   hasEmp=state.ops.some(r=>r.pt_ft_tagging),
-  who=state.view==='tech'?(state.tech?techName(state.tech):'No technician selected'):(state.market==='All Markets'?'All markets':state.market);
+  who=state.view==='tech'?(state.tech?techName(state.tech):'Select a technician'):(state.market==='All Markets'?'All markets':state.market);
  let s=summarize(scopeRows(),{pace}),
   lagNote=s.laborCoverage!=null&&s.laborCoverage<.999
    ?' <strong class="warnish">Payroll currently covers '+num(s.coveredDays,'number')+' of '+num(s.daysWorked,'number')+' worked days in this view</strong> — utilization and clocked hours are measured only over the covered days, so they stay accurate while the rest of the week catches up.':'';
  let tdNote=pace&&pace.partial?'<div class="notice small"><strong>This '+state.period+' is still in progress — '+pace.elapsed+' of '+pace.total+' days.</strong> Every card compares it against the first '+pace.elapsed+' days of the prior '+state.period+' and each sparkline point covers the same '+pace.elapsed+' days, so nothing on this page reads a partial '+state.period+' against a complete one. The period history table below is the exception: it deliberately shows each '+state.period+' in full.</div>':'';
- let periodNote=tdNote+'<div class="notice small"><strong>Labor is allocated from weekly payroll.</strong> Each technician’s weekly hours are split evenly across the days they worked in that week, then only the days inside the selected period are counted.'+lagNote+'</div>';
+ /* Both banners describe how the cards are built, so they wait until there are cards. */
+ let periodNote=state.view==='tech'&&!state.tech?'':tdNote+'<div class="notice small"><strong>Labor is allocated from weekly payroll.</strong> Each technician’s weekly hours are split evenly across the days they worked in that week, then only the days inside the selected period are counted.'+lagNote+'</div>';
  return '<div class="top"><div><h1 class="title">NuBrakes Technician Dashboard</h1>'+
  '<p class="subtitle">'+esc(who)+' · '+periodLabel(key)+' · data through '+fmtDateY(d.end)+(pace&&pace.partial?' (period in progress)':'')+'</p></div>'+
  '<div class="status-row"><span class="badge live"><i class="badge-dot"></i>Live Data</span>'+
@@ -377,7 +384,7 @@ function controls(){
  '<div class="toolbar">'+
  '<label class="field">Market<select class="select" id="market"><option>All Markets</option>'+markets().map(x=>'<option'+(x===state.market?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></label>'+
  (state.view==='tech'?'<label class="field">Technician<select class="select primary" id="tech">'+
-   (opts.length?'':'<option value="">No technicians in this filter</option>')+
+   '<option value=""'+(state.tech?'':' selected')+'>'+(opts.length?'Select a technician…':'No technicians in this filter')+'</option>'+
    opts.map(([id,nm])=>'<option value="'+esc(id)+'"'+(id===state.tech?' selected':'')+'>'+esc(nm)+'</option>').join('')+'</select></label>':'')+
  '<label class="field">View by<select class="select" id="period">'+[['month','Month'],['week','Week'],['day','Day']].map(([v,l])=>'<option value="'+v+'"'+(state.period===v?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
  '<label class="field">Select '+state.period+'<select class="select" id="periodKey">'+keys.map(k=>'<option value="'+k+'"'+(k===key?' selected':'')+'>'+periodLabel(k)+'</option>').join('')+'</select></label>'+
@@ -450,7 +457,13 @@ function historyTable(){
    return '<td class="'+(bg?'heat':'')+'" style="'+bg+'"'+(skip?' title="Period still in progress — not ranked against complete '+state.period+'s"':'')+'>'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
  '</tbody></table></div></section>'}
 function techView(){
- if(!state.tech)return '<div class="notice">Pick a technician above to load their scorecard. Adjust the market or employment filter if the one you want is not listed.</div>';
+ if(!state.tech)return '<div class="empty"><div class="empty-icon">◎</div>'+
+  '<h2>Select a technician to begin</h2>'+
+  '<p class="small">Use the <b>Technician</b> dropdown above to load an individual scorecard — revenue and pace, jobs, ticket metrics, and utilization, each measured against the '+
+  (state.market==='All Markets'?'technician’s own market':esc(state.market)+' market')+' and ranked among their peers.</p>'+
+  '<p class="small">Looking for someone who is not listed? Widen the market or employment filter. '+
+  'To review the whole '+(state.market==='All Markets'?'network':esc(state.market)+' market')+' first, switch to <b>Market View</b> and click any name in the leaderboard to open their scorecard here.</p>'+
+  '</div>';
  return techIdCard()+kpiCards()+trendSection()+historyTable()+peerTable()+definitions()}
 /* Where the technician sits among their peers for the same period. */
 function peerTable(){
@@ -611,16 +624,10 @@ function definitions(){let dirLabel=d=>d>0?'Higher is better':d<0?'Lower is bett
 
 /* ---------- wiring ---------- */
 function on(sel,ev,fn){let el=document.querySelector(sel);if(el)el[ev]=fn}
-/* Keep the technician selection legal whenever the market or employment filter moves. */
+/* No technician is ever chosen for the user. The dashboard opens on an explicit prompt to pick
+   one, and a selection is only ever cleared — never substituted — when a filter rules it out. */
 function reconcileTech(){
- let opts=techOptions().map(x=>x[0]);
- if(state.tech&&opts.includes(state.tech))return;
- state.tech=opts.length?defaultTech(opts):'' }
-function defaultTech(ids){
- let d=dates(),best=null,bestRev=-Infinity;
- ids.forEach(id=>{let rev=rowsIn(d.start,d.end,{tech:id}).reduce((a,r)=>a+n(r.revenue_amount),0);
-  if(rev>bestRev){bestRev=rev;best=id}});
- return best||ids[0]}
+ if(state.tech&&!techOptions().some(x=>x[0]===state.tech))state.tech=''}
 function wire(){
  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;if(state.view==='tech')reconcileTech();render()});
  on('#market','onchange',e=>{state.market=e.target.value;reconcileTech();render()});

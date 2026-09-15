@@ -51,7 +51,13 @@ select{cursor:pointer}
 .tag{font-size:8px;padding:2px 6px;border-radius:5px;background:#eef2ff;color:var(--deep);letter-spacing:.04em}
 .value{font-size:23px;font-weight:700;margin-bottom:4px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .spark-wrap{display:flex;align-items:center;gap:7px;height:32px;margin:2px 0}
-.sparkline{display:block;width:100%;height:30px}
+.sparkline{display:block;width:100%;height:30px;cursor:crosshair;touch-action:pan-y}
+.spark-tip{position:fixed;z-index:50;pointer-events:none;background:var(--dark);color:#fff;border-radius:8px;padding:7px 10px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:11px;line-height:1.35;white-space:nowrap}
+.spark-tip-period{font-weight:600;color:#cbd5e1;font-size:10px}
+.spark-tip-cur{font-size:8px;text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.14);padding:1px 5px;border-radius:4px;margin-left:4px}
+.spark-tip-value{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;margin:1px 0}
+.spark-tip-meta{font-size:10px;color:#9ca3af}
+.spark-tip .delta.up{color:#6ee7b7}.spark-tip .delta.down{color:#fda4b0}.spark-tip .delta.flat{color:#9ca3af}
 .rows{margin-top:auto;padding-top:8px;border-top:1px dashed var(--border);display:grid;gap:3px}
 .row{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--soft);align-items:baseline}
 .row b{font-weight:600;color:#4b5563;font-variant-numeric:tabular-nums}
@@ -594,25 +600,57 @@ function sparkSeries(key){
   return summarize(rowsIn(w.start,w.end,scopeOpts()),{pace:paceFor(k,true),noCache:true})[key]})}}
 function drawSparklines(){
  document.querySelectorAll('.sparkline').forEach(canvas=>{
-  let key=canvas.dataset.spark,s=sparkSeries(key),values=s.values,finite=values.filter(Number.isFinite),
-   ratio=window.devicePixelRatio||1,w=canvas.clientWidth,h=30;
-  if(!w){requestAnimationFrame(drawSparklines);return}
-  canvas.width=w*ratio;canvas.height=h*ratio;let ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);
-  ctx.strokeStyle='#eef2f7';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h-4);ctx.lineTo(w,h-4);ctx.stroke();
-  if(!finite.length){ctx.fillStyle='#9ca3af';ctx.font='10px system-ui';ctx.fillText('No trend data',2,18);return}
-  let min=Math.min(...finite),max=Math.max(...finite),spread=max-min||Math.abs(max)||1,
-   x=i=>s.keys.length===1?w/2:i*(w-4)/(s.keys.length-1)+2,y=v=>h-5-(v-min)/spread*(h-10),
-   dir=METRICS[key].dir,first=finite[0],last=finite[finite.length-1],
-   color=!dir?'#4a3aa7':((last-first)*dir>=0?'#047857':'#be123c');
-  ctx.strokeStyle=color;ctx.lineWidth=1.75;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
-  let drawing=false;
-  values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return}if(!drawing){ctx.moveTo(x(i),y(v));drawing=true}else ctx.lineTo(x(i),y(v))});
-  ctx.stroke();
-  let li=values.findLastIndex(Number.isFinite);
-  if(li>=0){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(li),y(values[li]),2.6,0,Math.PI*2);ctx.fill()}
-  let p=paceInfo();
-  canvas.title=METRICS[key].label+': last '+s.keys.length+' '+state.period+'s ('+s.keys[0]+' → '+s.keys.at(-1)+')'+
-   (p&&p.partial?', each measured over the first '+p.elapsed+' days':'')})}
+  if(!canvas.clientWidth){requestAnimationFrame(drawSparklines);return}
+  let key=canvas.dataset.spark,s=sparkSeries(key);
+  canvas._spark={key,keys:s.keys,values:s.values,windows:s.keys.map(k=>windowFor(k,true))};
+  /* An empty title stops the card's description tooltip from covering the hover readout. */
+  canvas.title='';
+  paintSpark(canvas,-1);
+  if(!canvas._wired){canvas._wired=true;
+   canvas.addEventListener('pointermove',e=>sparkHover(canvas,e));
+   canvas.addEventListener('pointerleave',()=>{paintSpark(canvas,-1);hideSparkTip()})}})}
+function sparkGeom(canvas){
+ let{keys,values}=canvas._spark,finite=values.filter(Number.isFinite),w=canvas.clientWidth,h=30;
+ if(!finite.length)return{w,h,empty:true};
+ let min=Math.min(...finite),max=Math.max(...finite),spread=max-min||Math.abs(max)||1;
+ return{w,h,finite,x:i=>keys.length===1?w/2:i*(w-4)/(keys.length-1)+2,y:v=>h-5-(v-min)/spread*(h-10)}}
+function paintSpark(canvas,hi){
+ let{key,values}=canvas._spark,g=sparkGeom(canvas),{w,h}=g,ratio=window.devicePixelRatio||1;
+ canvas.width=w*ratio;canvas.height=h*ratio;let ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);
+ ctx.strokeStyle='#eef2f7';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h-4);ctx.lineTo(w,h-4);ctx.stroke();
+ if(g.empty){ctx.fillStyle='#9ca3af';ctx.font='10px system-ui';ctx.fillText('No trend data',2,18);return}
+ let{x,y,finite}=g,dir=METRICS[key].dir,first=finite[0],last=finite[finite.length-1],
+  color=!dir?'#4a3aa7':((last-first)*dir>=0?'#047857':'#be123c');
+ if(hi>=0){ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.setLineDash([2,2]);ctx.beginPath();ctx.moveTo(x(hi),0);ctx.lineTo(x(hi),h);ctx.stroke();ctx.setLineDash([])}
+ ctx.strokeStyle=color;ctx.lineWidth=1.75;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+ let drawing=false;
+ values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return}if(!drawing){ctx.moveTo(x(i),y(v));drawing=true}else ctx.lineTo(x(i),y(v))});
+ ctx.stroke();
+ let li=values.findLastIndex(Number.isFinite);
+ if(li>=0){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x(li),y(values[li]),2.6,0,Math.PI*2);ctx.fill()}
+ if(hi>=0&&Number.isFinite(values[hi])){ctx.fillStyle='#fff';ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x(hi),y(values[hi]),3.6,0,Math.PI*2);ctx.fill();ctx.stroke()}}
+function sparkTip(){let t=document.querySelector('#sparkTip');
+ if(!t){t=document.createElement('div');t.id='sparkTip';t.className='spark-tip';t.setAttribute('role','tooltip');t.hidden=true;document.body.appendChild(t)}
+ return t}
+function hideSparkTip(){let t=document.querySelector('#sparkTip');if(t)t.hidden=true}
+function sparkHover(canvas,e){
+ let sp=canvas._spark;if(!sp||!sp.keys.length)return;
+ let g=sparkGeom(canvas);if(g.empty)return;
+ let r=canvas.getBoundingClientRect(),px=e.clientX-r.left,n=sp.keys.length,
+  i=n===1?0:Math.max(0,Math.min(n-1,Math.round((px-2)/((g.w-4)/(n-1)))));
+ paintSpark(canvas,i);
+ let m=METRICS[sp.key],v=sp.values[i],prev=i>0?sp.values[i-1]:null,win=sp.windows[i],b=periodBounds(sp.keys[i]),
+  truncated=win.end<b.end,
+  range=win.start===win.end?fmtDateY(win.start):fmtDate(win.start)+' – '+fmtDateY(win.end),
+  t=sparkTip();
+ t.innerHTML='<div class="spark-tip-period">'+esc(periodLabel(sp.keys[i]))+(i===n-1?' <span class="spark-tip-cur">current</span>':'')+'</div>'+
+  '<div class="spark-tip-value">'+num(v,m.format)+'</div>'+
+  '<div class="spark-tip-meta">'+esc(range)+(truncated?' · first '+spanDays(win.start,win.end)+' days':'')+'</div>'+
+  (i>0?'<div class="spark-tip-meta">vs prior point '+deltaSpan(v,prev,sp.key)+'</div>':'');
+ t.hidden=false;
+ let tw=t.offsetWidth,th=t.offsetHeight,left=r.left+g.x(i)-tw/2,top=r.top-th-8;
+ left=Math.max(8,Math.min(left,window.innerWidth-tw-8));if(top<8)top=r.bottom+8;
+ t.style.left=left+'px';t.style.top=top+'px'}
 
 /* ---------- definitions ---------- */
 function definitions(){let dirLabel=d=>d>0?'Higher is better':d<0?'Lower is better':'Volume-driven — not shaded';
@@ -655,8 +693,9 @@ function wire(){
    whenever the window changes width or they render at the wrong resolution. */
 let resizeTimer;
 window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(drawSparklines,120)});
+window.addEventListener('scroll',hideSparkTip,{passive:true});
 function render(){
- state.cache.clear();
+ state.cache.clear();hideSparkTip();
  document.querySelector('#app').innerHTML='<div class="app-inner">'+controls()+(state.view==='tech'?techView():marketView())+'</div>';
  wire();drawSparklines();drawTrend()}
 async function load(){

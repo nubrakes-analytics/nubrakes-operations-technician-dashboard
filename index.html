@@ -190,7 +190,7 @@ const RANGES=[['period','Selected period'],['l30','Last 30 days'],['l90','Last 9
 const GRAINS=[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly']];
 
 const state={ops:[],labor:[],allocated:[],allocIndex:new Map(),
- view:'tech',market:'All Markets',tech:'',employment:'all',
+ view:'tech',region:'All',market:'All Markets',tech:'',employment:'all',
  period:'month',periodKey:'',
  trendMetric:'avgTicket',granularity:'weekly',range:{mode:'l90',start:'',end:''},trendLabels:false,
  sort:{key:'revenue',dir:-1},heat:true,historyN:8,
@@ -261,6 +261,13 @@ function rangeDates(){let{min,max}=bounds(),m=state.range.mode;
 function rangeLabel(){let r=rangeDates();return fmtDateY(r.start)+' – '+fmtDateY(r.end)+' ('+spanDays(r.start,r.end)+' days)'}
 
 /* ---------- row selection ---------- */
+/* Regions are a fixed grouping of markets: the four Texas markets, and every other market is East. */
+const TEXAS_MARKETS=new Set(['Austin','Dallas','Houston','San Antonio']);
+const regionOf=m=>TEXAS_MARKETS.has(m)?'Texas':'East';
+const inRegion=m=>state.region==='All'||regionOf(m)===state.region;
+/* What "All Markets" means under the current region: the whole network, or just that region. */
+const allName=()=>state.region==='All'?'All markets':state.region+' markets';
+const netName=()=>state.region==='All'?'Network':state.region;
 const empOK=r=>state.employment==='all'||r.pt_ft_tagging===state.employment;
 /* o.tech pins to one technician and deliberately ignores the employment filter, so a selected
    technician never blanks out just because the filter above them says the other thing. */
@@ -268,13 +275,14 @@ function rowsIn(start,end,o={}){return state.ops.filter(r=>{let d=day(r);
  if(d<start||d>end)return false;
  if(o.tech)return r.technician_id===o.tech;
  if(o.market&&o.market!=='All Markets'&&r.market_name!==o.market)return false;
+ if(!inRegion(r.market_name))return false;
  return empOK(r)})}
-function markets(){return [...new Set(state.ops.map(r=>r.market_name))].sort()}
+function markets(){return [...new Set(state.ops.map(r=>r.market_name))].filter(inRegion).sort()}
 function techMarketOf(id){let c=new Map();state.ops.filter(r=>r.technician_id===id).forEach(r=>c.set(r.market_name,(c.get(r.market_name)||0)+1));
  return [...c].sort((a,b)=>b[1]-a[1])[0]?.[0]||null}
 function techName(id){let r=state.ops.find(x=>x.technician_id===id);return r?r.technician_name:id}
 function techOptions(){let m=new Map();
- state.ops.filter(r=>(state.market==='All Markets'||r.market_name===state.market)&&empOK(r)).forEach(r=>m.set(r.technician_id,r.technician_name));
+ state.ops.filter(r=>inRegion(r.market_name)&&(state.market==='All Markets'||r.market_name===state.market)&&empOK(r)).forEach(r=>m.set(r.technician_id,r.technician_name));
  return [...m].sort((a,b)=>a[1].localeCompare(b[1]))}
 function techsInMarket(mkt,start,end){return [...new Set(rowsIn(start,end,{market:mkt}).map(r=>r.technician_id))]}
 
@@ -348,7 +356,7 @@ function scopeRows(key){
 function benchInfo(){
  if(state.view==='tech'){let m=techMarketOf(state.tech);
   return m?{opts:{market:m},label:m+' avg / tech',divisor:'techs',market:m}:null}
- return state.market==='All Markets'?null:{opts:{market:'All Markets'},label:'Average market',divisor:'markets'}}
+ return state.market==='All Markets'?null:{opts:{market:'All Markets'},label:state.region==='All'?'Average market':'Average '+state.region+' market',divisor:'markets'}}
 function benchSummary(key){let b=benchInfo();if(!b)return null;
  let d=dates(key),rows=rowsIn(d.start,d.end,b.opts),s=summarize(rows,{pace:paceInfo(key)});
  let div=b.divisor==='techs'?s.activeTechs:new Set(rows.map(r=>r.market_name)).size;
@@ -373,7 +381,7 @@ function controls(){
  let d=dates(),key=activePeriodKey(),keys=periodKeys().reverse(),opts=techOptions(),
   cov=coverage(scopeRows()),pace=paceInfo(),
   hasEmp=state.ops.some(r=>r.pt_ft_tagging),
-  who=state.view==='tech'?(state.tech?techName(state.tech):'Select a technician'):(state.market==='All Markets'?'All markets':state.market);
+  who=state.view==='tech'?(state.tech?techName(state.tech):'Select a technician'):(state.market==='All Markets'?allName():state.market);
  let s=summarize(scopeRows(),{pace}),
   lagNote=s.laborCoverage!=null&&s.laborCoverage<.999
    ?' <strong class="warnish">Payroll currently covers '+num(s.coveredDays,'number')+' of '+num(s.daysWorked,'number')+' worked days in this view</strong> — utilization and clocked hours are measured only over the covered days, so they stay accurate while the rest of the week catches up.':'';
@@ -388,6 +396,7 @@ function controls(){
   [['tech','Technician View'],['market','Market View']].map(([k,l])=>'<button role="tab" aria-selected="'+(state.view===k)+'" class="'+(state.view===k?'active':'')+'" data-view="'+k+'">'+l+'</button>').join('')+
  '</div>'+
  '<div class="toolbar">'+
+ '<label class="field">Region<select class="select" id="region" style="min-width:110px">'+[['All','All'],['Texas','Texas'],['East','East']].map(([v,l])=>'<option value="'+v+'"'+(state.region===v?' selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
  '<label class="field">Market<select class="select" id="market"><option>All Markets</option>'+markets().map(x=>'<option'+(x===state.market?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></label>'+
  (state.view==='tech'?'<label class="field">Technician<select class="select primary" id="tech">'+
    '<option value=""'+(state.tech?'':' selected')+'>'+(opts.length?'Select a technician…':'No technicians in this filter')+'</option>'+
@@ -468,7 +477,7 @@ function techView(){
   '<p class="small">Use the <b>Technician</b> dropdown above to load an individual scorecard — revenue and pace, jobs, ticket metrics, and utilization, each measured against the '+
   (state.market==='All Markets'?'technician’s own market':esc(state.market)+' market')+' and ranked among their peers.</p>'+
   '<p class="small">Looking for someone who is not listed? Widen the market or employment filter. '+
-  'To review the whole '+(state.market==='All Markets'?'network':esc(state.market)+' market')+' first, switch to <b>Market View</b> and click any name in the leaderboard to open their scorecard here.</p>'+
+  'To review the whole '+(state.market==='All Markets'?(state.region==='All'?'network':esc(state.region)+' region'):esc(state.market)+' market')+' first, switch to <b>Market View</b> and click any name in the leaderboard to open their scorecard here.</p>'+
   '</div>';
  return techIdCard()+kpiCards()+trendSection()+historyTable()+peerTable()+definitions()}
 /* Where the technician sits among their peers for the same period. */
@@ -493,8 +502,8 @@ function peerTable(){
 
 /* ---------- market view ---------- */
 function marketIdCard(){
- let s=summarize(scopeRows(),{pace:paceInfo()}),name=state.market==='All Markets'?'All Markets':state.market;
- return '<div class="idcard"><div class="avatar mkt">'+esc(initials(name==='All Markets'?'ALL':name))+'</div>'+
+ let s=summarize(scopeRows(),{pace:paceInfo()}),name=state.market==='All Markets'?(state.region==='All'?'All Markets':state.region+' Markets'):state.market;
+ return '<div class="idcard"><div class="avatar mkt">'+esc(initials(state.market!=='All Markets'?name:state.region==='All'?'ALL':state.region==='Texas'?'TX':'EAST'))+'</div>'+
  '<div><p class="idname">'+esc(name)+'</p>'+
  '<p class="idmeta">'+periodLabel(activePeriodKey())+' · '+num(s.activeTechs,'number')+' active technicians · '+num(s.daysWorked,'number')+' technician-days worked</p></div>'+
  '<div class="idstats">'+
@@ -506,14 +515,14 @@ function marketTable(){
   data=markets().map(m=>Object.assign({market:m},summarize(rowsIn(d.start,d.end,{market:m}),{pace}))),
   heat={};MARKET_COLS.forEach(k=>{if(METRICS[k].dir)heat[k]=data.map(x=>x[k])});
  let all=summarize(rowsIn(d.start,d.end,{market:'All Markets'}),{pace,noCache:true});
- return '<section class="section"><div class="sec-head"><div><h2>All markets</h2>'+
- '<p class="small">Every market for the selected period, so a single market can be read against the network. Click a market to load it above.</p></div>'+
+ return '<section class="section"><div class="sec-head"><div><h2>'+esc(allName().replace(/^./,c=>c.toUpperCase()))+'</h2>'+
+ '<p class="small">Every '+(state.region==='All'?'':esc(state.region)+' ')+'market for the selected period, so a single market can be read against '+(state.region==='All'?'the network':'the region')+'. Click a market to load it above.</p></div>'+
  '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
  '<div class="scroll"><table><thead><tr><th class="pin txt">Market</th>'+MARKET_COLS.map(k=>'<th>'+METRICS[k].short+'</th>').join('')+'</tr></thead><tbody>'+
  data.map(x=>'<tr'+(x.market===state.market?' class="me"':'')+'><td class="pin link" data-market="'+esc(x.market)+'">'+esc(x.market)+'</td>'+
   MARKET_COLS.map(k=>{let bg=state.heat?heatBg(x[k],heat[k],METRICS[k].dir):'';
    return '<td class="'+(bg?'heat':'')+'" style="'+bg+'">'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
- '</tbody><tfoot><tr><td class="pin txt">Network</td>'+MARKET_COLS.map(k=>'<td>'+num(all[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'}
+ '</tbody><tfoot><tr><td class="pin txt">'+esc(netName())+'</td>'+MARKET_COLS.map(k=>'<td>'+num(all[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'}
 function leaderboard(){
  let d=dates(),pace=paceInfo(),rows=rowsIn(d.start,d.end,{market:state.market}),
   ids=[...new Set(rows.map(r=>r.technician_id))],
@@ -524,14 +533,14 @@ function leaderboard(){
  let heat={};TECH_COLS.forEach(k=>{if(METRICS[k].dir)heat[k]=data.map(x=>x[k])});
  let agg=summarize(rows,{pace,noCache:true});
  return '<section class="section"><div class="sec-head"><div><h2>Technician leaderboard</h2>'+
- '<p class="small">Every technician in '+esc(state.market==='All Markets'?'the network':state.market)+' for this period, sortable on any column. Shading ranks each column across the technicians shown; volume-driven columns are left unshaded. Click a name to open their scorecard in Technician View.</p></div>'+
+ '<p class="small">Every technician in '+esc(state.market==='All Markets'?(state.region==='All'?'the network':state.region):state.market)+' for this period, sortable on any column. Shading ranks each column across the technicians shown; volume-driven columns are left unshaded. Click a name to open their scorecard in Technician View.</p></div>'+
  '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+(state.heat?heatLegend():'')+toggleBtn('heat',state.heat,'Heat map')+'</div></div>'+
  '<div class="scroll"><table><thead><tr><th class="pin txt" data-sort="name">Technician</th><th class="txt">Market</th>'+
   TECH_COLS.map(k=>'<th data-sort="'+k+'">'+METRICS[k].short+' '+(state.sort.key===k?(state.sort.dir===1?'↑':'↓'):'↕')+'</th>').join('')+'</tr></thead><tbody>'+
  data.map(x=>'<tr><td class="pin link" data-tech="'+esc(x.id)+'">'+esc(x.name)+'</td><td class="txt">'+esc(x.market||'—')+'</td>'+
   TECH_COLS.map(k=>{let bg=state.heat?heatBg(x[k],heat[k],METRICS[k].dir):'';
    return '<td class="'+(bg?'heat':'')+'" style="'+bg+'">'+num(x[k],METRICS[k].format)+'</td>'}).join('')+'</tr>').join('')+
- '</tbody><tfoot><tr><td class="pin txt">'+esc(state.market==='All Markets'?'Network':state.market)+' overall</td><td></td>'+
+ '</tbody><tfoot><tr><td class="pin txt">'+esc(state.market==='All Markets'?netName():state.market)+' overall</td><td></td>'+
   TECH_COLS.map(k=>'<td>'+num(agg[k],METRICS[k].format)+'</td>').join('')+'</tr></tfoot></table></div></section>'+
  (data.length?'':'<p class="small">No technician activity in this selection.</p>')}
 function marketView(){return marketIdCard()+kpiCards()+trendSection()+leaderboard()+marketTable()+definitions()}
@@ -578,7 +587,7 @@ function drawTrend(){
   fb.innerHTML='<div class="scroll"><table class="fallback"><thead><tr><th class="txt">Period</th><th>'+m.short+'</th>'+(b?'<th>'+esc(b.label)+'</th>':'')+'</tr></thead><tbody>'+
    keys.map((x,i)=>'<tr><td class="txt">'+bucketLabel(x,g)+'</td><td>'+num(vals[i],m.format)+'</td>'+(b?'<td>'+num(bvals[i],m.format)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>';return}
  fb.classList.add('hidden');trendChart&&trendChart.destroy();
- let scopeLabel=state.view==='tech'?techName(state.tech):(state.market==='All Markets'?'All markets':state.market),
+ let scopeLabel=state.view==='tech'?techName(state.tech):(state.market==='All Markets'?allName():state.market),
   datasets=[{label:scopeLabel,data:vals,borderColor:'#4a3aa7',backgroundColor:'rgba(74,58,167,.10)',borderWidth:2.25,fill:true,tension:.25,spanGaps:true,
    pointRadius:keys.length>60?0:3,pointHoverRadius:6,pointBackgroundColor:'#4a3aa7',pointBorderColor:'#fff',pointBorderWidth:1.5}];
  if(b)datasets.push({label:b.label,data:bvals,borderColor:'#FF6B35',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],fill:false,tension:.25,spanGaps:true,
@@ -668,6 +677,7 @@ function reconcileTech(){
  if(state.tech&&!techOptions().some(x=>x[0]===state.tech))state.tech=''}
 function wire(){
  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;if(state.view==='tech')reconcileTech();render()});
+ on('#region','onchange',e=>{state.region=e.target.value;if(state.market!=='All Markets'&&!inRegion(state.market))state.market='All Markets';reconcileTech();render()});
  on('#market','onchange',e=>{state.market=e.target.value;reconcileTech();render()});
  on('#tech','onchange',e=>{state.tech=e.target.value;render()});
  on('#period','onchange',e=>{state.period=e.target.value;state.periodKey='';render()});
@@ -675,6 +685,7 @@ function wire(){
  on('#employment','onchange',e=>{state.employment=e.target.value;reconcileTech();render()});
  document.querySelectorAll('[data-tech]').forEach(x=>x.onclick=()=>{
   state.tech=x.dataset.tech;let m=techMarketOf(state.tech);
+  if(m&&!inRegion(m))state.region='All';
   if(m&&state.market!=='All Markets'&&state.market!==m)state.market=m;
   state.view='tech';window.scrollTo({top:0,behavior:'instant'});render()});
  document.querySelectorAll('[data-market]').forEach(x=>x.onclick=()=>{state.market=x.dataset.market;state.view='market';window.scrollTo({top:0,behavior:'instant'});render()});
@@ -713,4 +724,3 @@ async function load(){
 load();
 </script>
 </body></html>
- 

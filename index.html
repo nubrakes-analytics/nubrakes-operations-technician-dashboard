@@ -152,15 +152,15 @@ const METRICS={
   formula:'Σ rotor_attached_jobs_count ÷ Σ rotor_eligible_jobs_count',fields:'rotor_attached_jobs_count, rotor_eligible_jobs_count',description:'Eligible jobs only — jobs with no rotor opportunity are excluded from the denominator.'},
  serviceRate:{key:'serviceRate',label:'Service Call Rate',short:'Service Call',format:'percent',dir:-1,
   formula:'Σ service_call_jobs_count ÷ Σ completed_jobs_count',fields:'service_call_jobs_count, completed_jobs_count',description:'Return trips as a share of completed jobs. Lower is better, and it moves in lockstep with ticket quality — a rising service call rate usually shows up as a falling average ticket.'},
- utilization:{key:'utilization',label:'Technician Utilization',short:'Utilization',format:'percent',dir:1,
-  formula:'Invoiced Hours ÷ Total Clocked Hours',fields:'invoiced_minutes, Hours',description:'Share of paid clock time that landed on an invoice. Payroll arrives weekly and lags the operations feed, so both sides of the ratio are restricted to the days that carry allocated payroll \u2014 a week of payroll that has not posted yet cannot inflate the number.',requiresLabor:true},
+ utilization:{key:'utilization',label:'Technician Efficiency',short:'Efficiency',format:'percent',dir:1,
+  formula:'Σ invoiced hours on payroll-covered days ÷ Σ clocked hours (Regular + Overtime)',fields:'invoiced_minutes, Regular, Overtime',description:'Share of paid clock time that landed on an invoice. Payroll arrives weekly and lags the operations feed, so both sides of the ratio are restricted to the days that carry allocated payroll \u2014 a week of payroll that has not posted yet cannot inflate the number.',requiresLabor:true},
  invoicedHours:{key:'invoicedHours',label:'Invoiced Hours',short:'Inv. Hours',format:'hours',dir:1,perTech:true,
   formula:'Σ invoiced_minutes ÷ 60',fields:'invoiced_minutes',description:'Every billable hour written to invoices in the period, whether or not payroll has posted for that day.'},
  invoicedHoursMatched:{key:'invoicedHoursMatched',label:'Invoiced Hours',short:'Inv. Hours (matched)',format:'hours',dir:1,perTech:true,
-  formula:'Σ invoiced_minutes ÷ 60 across payroll-covered days',fields:'invoiced_minutes, Hours',
-  description:'The literal numerator of utilization. It counts only the days that also carry clocked hours, so Invoiced Hours ÷ Total Clocked Hours on the cards always reproduces the utilization shown beside them. Once payroll has fully posted it equals Invoiced Hours exactly.',requiresLabor:true},
+  formula:'Σ invoiced_minutes ÷ 60 across payroll-covered days',fields:'invoiced_minutes, Regular, Overtime',
+  description:'The literal numerator of efficiency. It counts only the days that also carry clocked hours, so Invoiced Hours ÷ Total Clocked Hours on the cards always reproduces the efficiency shown beside them. Once payroll has fully posted it equals Invoiced Hours exactly.',requiresLabor:true},
  clockedHours:{key:'clockedHours',label:'Total Clocked Hours',short:'Clocked Hours',format:'hours',dir:0,perTech:true,
-  formula:'Σ allocated Hours',fields:'Hours, worked_day_flag',description:'Paid clock hours from weekly payroll, allocated to worked days. Understated for any period where payroll has not fully posted; the card says how many days are covered. Volume-driven, so it is never heat-shaded.',requiresLabor:true},
+  formula:'Σ allocated (Regular + Overtime)',fields:'Regular, Overtime, worked_day_flag',description:'Hours on the clock from weekly payroll — Regular plus Overtime, allocated to worked days. Holiday and Paid Time Off are excluded because they are not time a technician could invoice. Understated for any period where payroll has not fully posted; the card says how many days are covered. Volume-driven, so it is never heat-shaded.',requiresLabor:true},
  revenuePerDay:{key:'revenuePerDay',label:'Revenue / Day',short:'Rev / Day',format:'currency',dir:1,
   formula:'Σ revenue_amount ÷ Σ worked_day_flag',fields:'revenue_amount, worked_day_flag',description:'Uses days worked, not calendar days.'},
  daysWorked:{key:'daysWorked',label:'Days Worked',short:'Days',format:'number',dir:0,
@@ -287,13 +287,19 @@ function techOptions(){let m=new Map();
 function techsInMarket(mkt,start,end){return [...new Set(rowsIn(start,end,{market:mkt}).map(r=>r.technician_id))]}
 
 /* ---------- labor allocation ---------- */
+/* Clocked hours are Regular + Overtime. Holiday and PTO are paid but not worked, so they would
+   drag efficiency down for days no one was on the clock. Older payroll extracts sent a single Hours column. */
+function clockHours(l){return 'Regular' in l||'Overtime' in l?n(l.Regular)+n(l.Overtime):n(l.Hours)}
 function allocate(){
  let byTW=new Map();
  state.ops.forEach((r,i)=>{r._key=i;let k=r.technician_id+'|'+week(r);(byTW.get(k)||byTW.set(k,[]).get(k)).push(r)});
  state.allocated=[];
- state.labor.forEach(l=>{let rs=byTW.get(l.technician_id+'|'+week(l))||[],worked=rs.filter(r=>n(r.worked_day_flag)),pool=worked.length?worked:rs;
+ /* A payroll row with no Regular or Overtime carries no clock data (the feed ships empty placeholder
+    rows for weeks it has not loaded). Treating it as coverage would put those weeks' invoiced hours
+    over zero clocked hours, so it is skipped and those days read as "payroll not posted". */
+ state.labor.forEach(l=>{if(clockHours(l)<=0)return;let rs=byTW.get(l.technician_id+'|'+week(l))||[],worked=rs.filter(r=>n(r.worked_day_flag)),pool=worked.length?worked:rs;
   pool.forEach(r=>state.allocated.push({_key:r._key,technician_id:l.technician_id,
-   hours:n(l.Hours)/pool.length,cost:n(l['Total Employer Cost'])/pool.length,fallback:!worked.length}))});
+   hours:clockHours(l)/pool.length,cost:n(l['Total Employer Cost'])/pool.length,fallback:!worked.length}))});
  state.allocIndex=new Map();
  state.allocated.forEach(a=>{(state.allocIndex.get(a._key)||state.allocIndex.set(a._key,[]).get(a._key)).push(a)})}
 function laborFor(rows){let out=[];for(let i=0;i<rows.length;i++){let a=state.allocIndex.get(rows[i]._key);if(a)for(let j=0;j<a.length;j++)out.push(a[j])}return out}
@@ -384,7 +390,7 @@ function controls(){
   who=state.view==='tech'?(state.tech?techName(state.tech):'Select a technician'):(state.market==='All Markets'?allName():state.market);
  let s=summarize(scopeRows(),{pace}),
   lagNote=s.laborCoverage!=null&&s.laborCoverage<.999
-   ?' <strong class="warnish">Payroll currently covers '+num(s.coveredDays,'number')+' of '+num(s.daysWorked,'number')+' worked days in this view</strong> — utilization and clocked hours are measured only over the covered days, so they stay accurate while the rest of the week catches up.':'';
+   ?' <strong class="warnish">Payroll currently covers '+num(s.coveredDays,'number')+' of '+num(s.daysWorked,'number')+' worked days in this view</strong> — efficiency and clocked hours are measured only over the covered days, so they stay accurate while the rest of the week catches up.':'';
  let tdNote=pace&&pace.partial?'<div class="notice small"><strong>This '+state.period+' is still in progress — '+pace.elapsed+' of '+pace.total+' days.</strong> Every card compares it against the first '+pace.elapsed+' days of the prior '+state.period+' and each sparkline point covers the same '+pace.elapsed+' days, so nothing on this page reads a partial '+state.period+' against a complete one. The period history table below is the exception: it deliberately shows each '+state.period+' in full.</div>':'';
  /* Both banners describe how the cards are built, so they wait until there are cards. */
  let periodNote=state.view==='tech'&&!state.tech?'':tdNote+'<div class="notice small"><strong>Labor is allocated from weekly payroll.</strong> Each technician’s weekly hours are split evenly across the days they worked in that week, then only the days inside the selected period are counted.'+lagNote+'</div>';
@@ -452,7 +458,7 @@ function techIdCard(){
  '<div><p class="idname">'+esc(techName(state.tech))+'</p>'+
  '<p class="idmeta">'+esc(mkt)+' · '+emp+' · '+periodLabel(activePeriodKey())+(rk?' · '+rk.total+' technicians in market':'')+'</p></div>'+
  '<div class="idstats">'+
-  [['Days worked',num(s.daysWorked,'number')],['Revenue',num(s.revenue,'currency')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Utilization',num(s.utilization,'percent')]]
+  [['Days worked',num(s.daysWorked,'number')],['Revenue',num(s.revenue,'currency')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Efficiency',num(s.utilization,'percent')]]
   .map(([l,v])=>'<div class="idstat"><b>'+v+'</b><span>'+l+'</span></div>').join('')+
  '</div></div>'}
 function historyTable(){
@@ -474,7 +480,7 @@ function historyTable(){
 function techView(){
  if(!state.tech)return '<div class="empty"><div class="empty-icon">◎</div>'+
   '<h2>Select a technician to begin</h2>'+
-  '<p class="small">Use the <b>Technician</b> dropdown above to load an individual scorecard — revenue and pace, jobs, ticket metrics, and utilization, each measured against the '+
+  '<p class="small">Use the <b>Technician</b> dropdown above to load an individual scorecard — revenue and pace, jobs, ticket metrics, and efficiency, each measured against the '+
   (state.market==='All Markets'?'technician’s own market':esc(state.market)+' market')+' and ranked among their peers.</p>'+
   '<p class="small">Looking for someone who is not listed? Widen the market or employment filter. '+
   'To review the whole '+(state.market==='All Markets'?(state.region==='All'?'network':esc(state.region)+' region'):esc(state.market)+' market')+' first, switch to <b>Market View</b> and click any name in the leaderboard to open their scorecard here.</p>'+
@@ -507,7 +513,7 @@ function marketIdCard(){
  '<div><p class="idname">'+esc(name)+'</p>'+
  '<p class="idmeta">'+periodLabel(activePeriodKey())+' · '+num(s.activeTechs,'number')+' active technicians · '+num(s.daysWorked,'number')+' technician-days worked</p></div>'+
  '<div class="idstats">'+
-  [['Revenue',num(s.revenue,'currency')],['Jobs',num(s.jobs,'number')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Utilization',num(s.utilization,'percent')]]
+  [['Revenue',num(s.revenue,'currency')],['Jobs',num(s.jobs,'number')],['Avg ticket',num(s.avgTicket,'currency')],['Service call',num(s.serviceRate,'percent')],['Efficiency',num(s.utilization,'percent')]]
   .map(([l,v])=>'<div class="idstat"><b>'+v+'</b><span>'+l+'</span></div>').join('')+
  '</div></div>'}
 function marketTable(){
@@ -558,7 +564,7 @@ function trendSection(){
  return '<section class="section"><div class="sec-head"><div><h2>'+m.label+' over time</h2>'+
  '<p class="small">'+rangeLabel()+' · '+GRAINS.find(g=>g[0]===state.granularity)[1].toLowerCase()+' buckets'+
  (b?' · dashed line is '+esc(b.label):'')+
- (state.granularity==='daily'&&m.requiresLabor?' · utilization is blank at daily granularity because payroll arrives weekly':'')+'</p></div>'+
+ (state.granularity==='daily'&&m.requiresLabor?' · efficiency is blank at daily granularity because payroll arrives weekly':'')+'</p></div>'+
  '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="field">KPI<select class="select" id="trendMetric">'+
   TREND_METRICS.map(k=>'<option value="'+k+'"'+(k===state.trendMetric?' selected':'')+'>'+METRICS[k].label+'</option>').join('')+'</select></label>'+
  '<div class="seg">'+GRAINS.map(([k,l])=>'<button class="'+(state.granularity===k?'active':'')+'" data-gran="'+k+'">'+l+'</button>').join('')+'</div>'+

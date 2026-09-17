@@ -161,6 +161,12 @@ const METRICS={
   description:'The literal numerator of efficiency. It counts only the days that also carry clocked hours, so Invoiced Hours ÷ Total Clocked Hours on the cards always reproduces the efficiency shown beside them. Once payroll has fully posted it equals Invoiced Hours exactly.',requiresLabor:true},
  clockedHours:{key:'clockedHours',label:'Total Clocked Hours',short:'Clocked Hours',format:'hours',dir:0,perTech:true,
   formula:'Σ allocated (Regular + Overtime)',fields:'Regular, Overtime, worked_day_flag',description:'Hours on the clock from weekly payroll — Regular plus Overtime, allocated to worked days. Holiday and Paid Time Off are excluded because they are not time a technician could invoice. Understated for any period where payroll has not fully posted; the card says how many days are covered. Volume-driven, so it is never heat-shaded.',requiresLabor:true},
+ driveHours:{key:'driveHours',label:'Drive Hours',short:'Drive Hrs',format:'hours',dir:0,perTech:true,requiresDrive:true,
+  formula:'Σ Normalized Drive Time',fields:'Normalized Drive Time (fact_technician_operations_daily)',description:'Total drive time logged in the period, read day by day from the operations feed. Volume-driven, so it is never heat-shaded. Drive data starts July 1, 2026; earlier periods show a dash.'},
+ drivePerDay:{key:'drivePerDay',label:'Drive Hours / Day',short:'Drive / Day',format:'hours',dir:-1,requiresDrive:true,
+  formula:'Σ Normalized Drive Time ÷ worked days that carry drive time',fields:'Normalized Drive Time, worked_day_flag',description:'Average drive time per worked day. Only worked days with a drive-time entry count in the denominator, so a technician whose drive data is missing is not credited with zero driving. Lower is better.'},
+ drivePerJob:{key:'drivePerJob',label:'Drive Hours / Job',short:'Drive / Job',format:'hours',dir:-1,requiresDrive:true,
+  formula:'Σ Normalized Drive Time ÷ Σ completed_jobs_count on drive-covered days',fields:'Normalized Drive Time, completed_jobs_count',description:'Drive time behind each completed job, over the same drive-covered days. Lower is better — it reads routing density.'},
  revenuePerDay:{key:'revenuePerDay',label:'Revenue / Day',short:'Rev / Day',format:'currency',dir:1,
   formula:'Σ revenue_amount ÷ Σ worked_day_flag',fields:'revenue_amount, worked_day_flag',description:'Uses days worked, not calendar days.'},
  daysWorked:{key:'daysWorked',label:'Days Worked',short:'Days',format:'number',dir:0,
@@ -173,17 +179,18 @@ const GROUPS=[
  ['Revenue','invoiced revenue and where the period lands',['revenue','revenuePace']],
  ['Jobs','throughput',['jobs','jobsPerDay']],
  ['Ticket','what each job is worth',['avgTicket','serviceRate','ticketCompletion','rotorAttach']],
- ['Productivity','invoiced hours against the clock',['utilization','invoicedHoursMatched','clockedHours']]
+ ['Productivity','invoiced hours against the clock',['utilization','invoicedHoursMatched','clockedHours']],
+ ['Drive','time on the road, from the daily operations feed',['driveHours','drivePerDay','drivePerJob']]
 ];
 const HERO=new Set(['avgTicket','serviceRate']);
-const RANKED=['revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
-const TECH_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','invoicedHours','clockedHours','utilization'];
-const MARKET_COLS=['activeTechs','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
+const RANKED=['revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization','drivePerDay','drivePerJob'];
+const TECH_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','invoicedHours','clockedHours','utilization','driveHours','drivePerDay','drivePerJob'];
+const MARKET_COLS=['activeTechs','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization','drivePerDay','drivePerJob'];
 /* Totals that grow with the length of the period. A period still in progress cannot be ranked
    against complete ones on these, so it is left out of the scale and its own cells stay unshaded. */
-const LENGTH_SENSITIVE=new Set(['revenue','jobs','daysWorked','invoicedHours','invoicedHoursMatched','clockedHours']);
-const HISTORY_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization'];
-const TREND_METRICS=['avgTicket','serviceRate','revenue','jobs','jobsPerDay','ticketCompletion','rotorAttach','utilization','revenuePerDay','invoicedHours'];
+const LENGTH_SENSITIVE=new Set(['revenue','jobs','daysWorked','invoicedHours','invoicedHoursMatched','clockedHours','driveHours']);
+const HISTORY_COLS=['daysWorked','revenue','jobs','jobsPerDay','avgTicket','serviceRate','ticketCompletion','rotorAttach','utilization','drivePerDay','drivePerJob'];
+const TREND_METRICS=['avgTicket','serviceRate','revenue','jobs','jobsPerDay','ticketCompletion','rotorAttach','utilization','drivePerDay','drivePerJob','driveHours','revenuePerDay','invoicedHours'];
 /* Card labels that change with payroll coverage. */
 const MATCHED_SUFFIX=' (payroll-matched)';
 const RANGES=[['period','Selected period'],['l30','Last 30 days'],['l90','Last 90 days'],['l180','Last 6 months'],['ytd','Year to date'],['all','All data'],['custom','Custom']];
@@ -205,12 +212,12 @@ const fmtDateY=s=>new Date(s+'T12:00:00').toLocaleDateString(undefined,{month:'s
 function num(v,f){if(v==null||Number.isNaN(v))return '—';
  if(f==='currency')return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:Math.abs(v)>=1000?0:1}).format(v);
  if(f==='percent')return (v*100).toFixed(1)+'%';
- if(f==='hours')return v.toFixed(1)+'h';
+ if(f==='hours')return v.toFixed(Math.abs(v)<10?2:1)+'h';
  return new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(v)}
 function numShort(v,f){if(v==null||!Number.isFinite(v))return '';
  if(f==='currency'){let a=Math.abs(v);return a>=10000?(v<0?'-$':'$')+(a/1000).toFixed(1)+'k':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v)}
  if(f==='percent')return (v*100).toFixed(0)+'%';
- if(f==='hours')return v.toFixed(0)+'h';
+ if(f==='hours')return v.toFixed(Math.abs(v)<10?1:0)+'h';
  return new Intl.NumberFormat('en-US',{maximumFractionDigits:Math.abs(v)<10?1:0}).format(v)}
 function shiftDays(iso,d){let x=new Date(iso+'T12:00:00');x.setDate(x.getDate()+d);return x.toISOString().slice(0,10)}
 function spanDays(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5)+1}
@@ -323,7 +330,13 @@ function summarize(rows,opts={}){
   covered=rows.filter(r=>state.allocIndex.has(r._key)),
   coveredInvoiced=covered.reduce((a,r)=>a+n(r.invoiced_minutes),0)/60,
   coveredDays=covered.reduce((a,r)=>a+n(r.worked_day_flag),0),
-  laborOK=clock>0;
+  laborOK=clock>0,
+  /* Drive time comes straight from the daily operations feed. A worked day with no entry is
+     missing data, not zero driving, so the per-day and per-job rates only use days that have one. */
+  driveRows=rows.filter(r=>n(r['Normalized Drive Time'])>0),
+  drive=driveRows.reduce((a,r)=>a+n(r['Normalized Drive Time']),0),
+  driveDays=driveRows.reduce((a,r)=>a+n(r.worked_day_flag),0),
+  driveJobs=driveRows.reduce((a,r)=>a+n(r.completed_jobs_count),0);
  let out={revenue,jobs,daysWorked,invoicedHours,activeTechs:cov.active,
   avgTicket:invoiced?revenue/invoiced:null,
   ticketCompletion:booked?revenue/booked:null,
@@ -334,6 +347,10 @@ function summarize(rows,opts={}){
   clockedHours:laborOK?clock:null,
   invoicedHoursMatched:laborOK?coveredInvoiced:null,
   utilization:laborOK?coveredInvoiced/clock:null,
+  driveHours:driveRows.length?drive:null,
+  drivePerDay:driveDays?drive/driveDays:null,
+  drivePerJob:driveJobs?drive/driveJobs:null,
+  driveDays,driveCoverage:daysWorked&&driveRows.length?driveDays/daysWorked:null,
   revenuePace:null,jobsPace:null,
   coveredDays,laborCoverage:daysWorked?coveredDays/daysWorked:null,
   coverage:cov,partialLabor:laborOK&&!cov.complete};
@@ -437,6 +454,8 @@ function card(k,cur,prior,bs,rk){
   (rk&&rk[k]!==undefined?'<div class="row"><span>Rank in '+esc(rk.market)+'</span>'+rankPill(rk[k])+'</div>':'')+
   (m.requiresLabor&&cur.laborCoverage!=null&&cur.laborCoverage<.999
    ?'<div class="row"><span>Payroll covers</span><b class="warnish">'+num(cur.coveredDays,'number')+' of '+num(cur.daysWorked,'number')+' days</b></div>':'')+
+  (m.requiresDrive&&cur.driveCoverage!=null&&cur.driveCoverage<.999
+   ?'<div class="row"><span>Drive data covers</span><b class="warnish">'+num(cur.driveDays,'number')+' of '+num(cur.daysWorked,'number')+' days</b></div>':'')+
  '</div></div>'}
 function kpiCards(){
  let key=activePeriodKey(),pace=paceInfo(),pk=priorKey(key),
